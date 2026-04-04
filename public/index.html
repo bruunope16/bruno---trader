@@ -1,0 +1,398 @@
+<script>
+
+let state = {
+balance: 1000,
+signals: [],
+marketData: {},
+
+ai:{
+learningRate:1,
+wins:0,
+losses:0,
+btcTrend:"neutral",
+marketTrend:"neutral"
+},
+
+stats: {
+totalProfit: 0,
+totalTrades: 0,
+wins: 0,
+losses: 0,
+signalsToday: 0
+},
+
+equityHistory: [1000]
+};
+
+const ctx = document.getElementById('equityChart').getContext('2d');
+
+const equityChart = new Chart(ctx, {
+type: 'line',
+data: {
+labels: ['Início'],
+datasets: [{
+label: 'Banca',
+data: [1000],
+borderColor: '#00ff41',
+backgroundColor: 'rgba(0,255,65,0.1)',
+borderWidth: 2,
+tension: 0.4,
+fill: true
+}]
+},
+options: {
+responsive: true,
+maintainAspectRatio: false,
+plugins: { legend: { display:false } },
+scales: {
+y: {
+grid:{color:'#2a2a2a'},
+ticks:{
+color:'#999',
+callback:(v)=>`R$ ${v}`
+}
+},
+x:{
+grid:{color:'#2a2a2a'},
+ticks:{color:'#999'}
+}
+}
+}
+});
+
+
+/* ============================
+IA ENGINE
+============================ */
+
+function analyzeBTC(){
+
+const btc = state.marketData["BTCUSDT"]
+
+if(!btc) return
+
+if(btc.change24h > 1){
+state.ai.btcTrend = "bullish"
+}
+else if(btc.change24h < -1){
+state.ai.btcTrend = "bearish"
+}
+else{
+state.ai.btcTrend = "neutral"
+}
+
+}
+
+function analyzeMarketTrend(){
+
+const coins = Object.values(state.marketData)
+
+let bullish = 0
+let bearish = 0
+
+coins.forEach(coin=>{
+if(coin.change24h > 0) bullish++
+else bearish++
+})
+
+state.ai.marketTrend = bullish > bearish ? "bullish":"bearish"
+
+}
+
+function detectBreakout(coin){
+
+return Math.abs(coin.change24h) > 7
+
+}
+
+function calculateAIScore(coin){
+
+let score = 50
+
+const volatility = Math.abs(coin.change24h)
+
+if(volatility > 8) score += 20
+else if(volatility > 5) score += 15
+else if(volatility > 3) score += 10
+
+if(state.ai.btcTrend === "bullish" && coin.change24h > 0){
+score += 15
+}
+
+if(state.ai.btcTrend === "bearish" && coin.change24h < 0){
+score += 15
+}
+
+if(state.ai.marketTrend === "bullish"){
+score += 5
+}
+
+if(detectBreakout(coin)){
+score += 15
+}
+
+score += state.ai.learningRate
+
+score = Math.min(95, score)
+
+return{
+score,
+confidence: score > 80 ? "Alta" : "Média",
+probability: score
+}
+
+}
+
+
+/* ============================
+LOGS
+============================ */
+
+function addActivityLog(msg,type='info'){
+const c=document.getElementById('activityLog')
+const t=new Date().toLocaleTimeString()
+
+const el=document.createElement('div')
+el.className=`activity-item ${type}`
+
+el.innerHTML=`
+<div class="activity-time">${t}</div>
+<div class="activity-content">${msg}</div>
+`
+
+c.prepend(el)
+
+if(c.children.length>50){
+c.removeChild(c.lastChild)
+}
+}
+
+function addAnalysisLog(msg,type='info'){
+const c=document.getElementById('analysisLog')
+const t=new Date().toLocaleTimeString()
+
+const el=document.createElement('div')
+el.className=`log-entry ${type}`
+
+el.innerHTML=`
+<span class="log-time">[${t}]</span>
+<span class="log-message">${msg}</span>
+`
+
+c.prepend(el)
+
+}
+
+
+/* ============================
+STATS
+============================ */
+
+function updateStats(){
+
+const winRate=state.stats.totalTrades>0
+?((state.stats.wins/state.stats.totalTrades)*100).toFixed(1)
+:0
+
+const roi=((state.balance-1000)/1000*100).toFixed(2)
+
+document.getElementById('totalProfit').textContent=
+`+R$ ${state.stats.totalProfit.toFixed(2)}`
+
+document.getElementById('roi').textContent=
+`ROI: ${roi}%`
+
+document.getElementById('totalTrades').textContent=
+state.stats.totalTrades
+
+document.getElementById('wins').textContent=
+`${state.stats.wins} WIN`
+
+document.getElementById('losses').textContent=
+`${state.stats.losses} LOSS`
+
+document.getElementById('winRate').textContent=
+`${winRate}%`
+
+document.getElementById('signalsToday').textContent=
+state.stats.signalsToday
+
+}
+
+
+/* ============================
+FETCH MERCADO
+============================ */
+
+async function fetchData(){
+
+try{
+
+addAnalysisLog("📡 IA analisando mercado...","info")
+
+const res=await fetch(
+"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1"
+)
+
+const data=await res.json()
+
+const market={}
+
+data.forEach(c=>{
+
+const pair=c.symbol.toUpperCase()+"USDT"
+
+market[pair]={
+price:c.current_price,
+change24h:c.price_change_percentage_24h
+}
+
+})
+
+state.marketData=market
+
+analyzeBTC()
+analyzeMarketTrend()
+
+renderMarket()
+
+generateSignals()
+
+updateStats()
+
+}catch(e){
+
+console.error(e)
+
+}
+
+}
+
+
+/* ============================
+GERAR SINAIS IA
+============================ */
+
+function generateSignals(){
+
+const pairs=Object.entries(state.marketData)
+
+const selected=pairs
+.filter(p=>Math.abs(p[1].change24h)>2)
+.sort((a,b)=>Math.abs(b[1].change24h)-Math.abs(a[1].change24h))
+.slice(0,5)
+
+state.signals=selected.map(([pair,data])=>{
+
+const ai = calculateAIScore(data)
+
+return{
+
+pair,
+direction:data.change24h>0?"LONG":"SHORT",
+entry:data.price,
+stopLoss:(data.price*0.98).toFixed(2),
+tp2:(data.price*1.03).toFixed(2),
+
+ranking:ai.score,
+confidence:ai.confidence,
+probability:ai.probability
+
+}
+
+})
+
+state.stats.signalsToday=state.signals.length
+
+renderSignals()
+
+}
+
+
+/* ============================
+RENDER SIGNALS
+============================ */
+
+function renderSignals(){
+
+const grid=document.getElementById('signalsGrid')
+
+grid.innerHTML=state.signals.map(signal=>`
+
+<div class="signal-card">
+
+<div class="signal-header">
+
+<div class="signal-pair">${signal.pair}</div>
+
+<div class="signal-direction ${signal.direction.toLowerCase()}">
+${signal.direction}
+</div>
+
+</div>
+
+<div class="signal-metrics">
+
+<div>
+<div>Entrada</div>
+<div>$${signal.entry}</div>
+</div>
+
+<div>
+<div>Score IA</div>
+<div>${signal.ranking}%</div>
+</div>
+
+<div>
+<div>Confiança</div>
+<div>${signal.confidence}</div>
+</div>
+
+</div>
+
+</div>
+
+`).join("")
+
+}
+
+
+/* ============================
+RENDER MARKET
+============================ */
+
+function renderMarket(){
+
+const grid=document.getElementById("marketGrid")
+
+const pairs=Object.entries(state.marketData).slice(0,20)
+
+grid.innerHTML=pairs.map(([pair,data])=>`
+
+<div class="market-item">
+
+<div class="market-pair">${pair}</div>
+<div>$${data.price}</div>
+
+<div class="${data.change24h>0?"positive":"negative"}">
+${data.change24h.toFixed(2)}%
+</div>
+
+</div>
+
+`).join("")
+
+}
+
+
+/* ============================
+START
+============================ */
+
+addActivityLog("🚀 IA Ativada","signal")
+
+fetchData()
+
+setInterval(fetchData,10000)
+
+</script>
