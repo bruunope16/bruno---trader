@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bruno Trader Pro | Elite Trading Terminal</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    :root {
+      --bg-dark: #0d0d0d;
+      --bg-panel: #151515;
+      --bg-card: #1a1a1a;
+      --accent-green: #00ff41;
+      --accent-cyan: #00e5ff;
+      --accent-red: #ff0844;
+      --accent-orange: #ff6b00;
+      --accent-purple: #b026ff;
+      --text-primary: #ffffff;
+      --text-secondary: #999999;
+      --text-muted: #666666;
+      --border: #2a2a2a;
+      --shadow: rgba(0, 255, 65, 0.1);
+    }
+    
+    body {
+      font-family: 'IBM Plex Mono', monospace;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      overflow-x: hidden;
+      line-height: 1.5;
+    }
+    
+    /* Scanlines effect */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 255, 65, 0.02) 2px,
+        rgba(0, 255, 65, 0.02) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+    
+    .container {
+      max-width: 1920px;
+      margin: 0 auto;
+      padding: 15px;
+    }
+    
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+    
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    .logo {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent-green);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      position: relative;
+    }
+    
+    .logo::before {
+      content: '▸';
+      margin-right: 8px;
+      animation: blink 1s infinite;
+    }
+    
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0.3; }
+    }
+    
+    .status-live {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(0, 255, 65, 0.1);
+      border: 1px solid var(--accent-green);
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(0, 255, 65, 0.7);
+      }
+      50% {
+        box-shadow: 0 0 0 8px rgba(0, 255, 65, 0);
+      }
+    }
+    
+    .header-stats {
+      display: flex;
+      gap: 30px;
+      font-size: 12px;
+    }
+    
+    .header-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    
+    .header-stat-label {
+      color: var(--text-muted);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+    
+    .header-stat-value {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent-green);
+    }
+    
+    /* Main Grid */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 300px 1fr 350px;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+    
+    /* Performance Panel */
+    .performance-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      padding: 20px;
+    }
+    
+    .panel-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+      color: var(--accent-cyan);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+    
+    .perf-metric {
+      margin-bottom: 20px;
+    }
+    
+    .perf-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 5px;
+    }
+    
+    .perf-value {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    
+    .perf-value.positive {
+      color: var(--accent-green);
+    }
+    
+    .perf-value.negative {
+      color: var(--accent-red);
+    }
+    
+    .perf-change {
+      font-size: 11px;
+      margin-top: 3px;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: var(--bg-dark);
+      margin-top: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan));
+      transition: width 0.5s ease;
+    }
+    
+    /* Chart Panel */
+    .chart-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      padding: 20px;
+    }
+    
+    .chart-container {
+      height: 300px;
+      margin-top: 15px;
+    }
+    
+    /* Activity Panel */
+    .activity-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      padding: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .activity-item {
+      padding: 12px;
+      background: var(--bg-card);
+      border-left: 3px solid transparent;
+      margin-bottom: 8px;
+      font-size: 11px;
+      transition: all 0.2s;
+    }
+    
+    .activity-item:hover {
+      background: rgba(0, 255, 65, 0.05);
+      border-left-color: var(--accent-green);
+    }
+    
+    .activity-item.analyzing {
+      border-left-color: var(--accent-cyan);
+    }
+    
+    .activity-item.signal {
+      border-left-color: var(--accent-green);
+    }
+    
+    .activity-item.rejected {
+      border-left-color: var(--text-muted);
+    }
+    
+    .activity-time {
+      color: var(--text-muted);
+      font-size: 10px;
+    }
+    
+    .activity-content {
+      margin-top: 4px;
+      color: var(--text-secondary);
+    }
+    
+    /* Signals Grid */
+    .signals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+    
+    .signal-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      padding: 20px;
+      position: relative;
+      transition: all 0.3s;
+    }
+    
+    .signal-card:hover {
+      border-color: var(--accent-green);
+      box-shadow: 0 0 20px var(--shadow);
+      transform: translateY(-2px);
+    }
+    
+    .signal-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan));
+    }
+    
+    .signal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .signal-pair {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent-green);
+    }
+    
+    .signal-direction {
+      padding: 4px 12px;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 2px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .signal-direction.long {
+      background: rgba(0, 255, 65, 0.2);
+      color: var(--accent-green);
+    }
+    
+    .signal-direction.short {
+      background: rgba(255, 8, 68, 0.2);
+      color: var(--accent-red);
+    }
+    
+    .signal-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+    
+    .signal-metric {
+      font-size: 11px;
+    }
+    
+    .signal-metric-label {
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-size: 9px;
+      letter-spacing: 1px;
+    }
+    
+    .signal-metric-value {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-top: 2px;
+    }
+    
+    .signal-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+    }
+    
+    .signal-score {
+      color: var(--accent-cyan);
+    }
+    
+    .signal-result {
+      padding: 3px 8px;
+      border-radius: 2px;
+      font-weight: 600;
+    }
+    
+    .signal-result.win {
+      background: rgba(0, 255, 65, 0.2);
+      color: var(--accent-green);
+    }
+    
+    .signal-result.loss {
+      background: rgba(255, 8, 68, 0.2);
+      color: var(--accent-red);
+    }
+    
+    .signal-result.pending {
+      background: rgba(255, 107, 0, 0.2);
+      color: var(--accent-orange);
+    }
+    
+    /* Market Monitor */
+    .market-monitor {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      padding: 20px;
+    }
+    
+    .market-grid {
+      display: grid;
+      gap: 8px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .market-item {
+      display: grid;
+      grid-template-columns: 100px 1fr 80px 60px 40px;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      background: var(--bg-card);
+      font-size: 11px;
+      border-left: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    
+    .market-item:hover {
+      background: rgba(0, 255, 65, 0.05);
+    }
+    
+    .market-item.approved {
+      border-left-color: var(--accent-green);
+    }
+    
+    .market-item.almost {
+      border-left-color: var(--accent-orange);
+    }
+    
+    .market-pair {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    
+    .market-price {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 600;
+    }
+    
+    .market-change {
+      text-align: right;
+    }
+    
+    .market-change.positive {
+      color: var(--accent-green);
+    }
+    
+    .market-change.negative {
+      color: var(--accent-red);
+    }
+    
+    .market-vol {
+      text-align: right;
+      color: var(--text-muted);
+    }
+    
+    .market-status {
+      text-align: center;
+      font-size: 16px;
+    }
+    
+    /* Analysis Log */
+    .analysis-log {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      padding: 20px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    
+    .log-entry {
+      padding: 8px 12px;
+      margin-bottom: 4px;
+      background: var(--bg-card);
+      font-size: 11px;
+      border-left: 3px solid var(--border);
+      line-height: 1.6;
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    .log-entry.info {
+      border-left-color: var(--accent-cyan);
+    }
+    
+    .log-entry.success {
+      border-left-color: var(--accent-green);
+    }
+    
+    .log-entry.warning {
+      border-left-color: var(--accent-orange);
+    }
+    
+    .log-entry.error {
+      border-left-color: var(--accent-red);
+    }
+    
+    .log-time {
+      color: var(--text-muted);
+    }
+    
+    .log-message {
+      color: var(--text-secondary);
+      margin-left: 10px;
+    }
+    
+    .log-highlight {
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: var(--bg-dark);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-green);
+    }
+    
+    /* Responsive */
+    @media (max-width: 1400px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        gap: 15px;
+      }
+      
+      .signals-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-area">
+        <div class="logo">BRUNO TRADER PRO</div>
+        <div class="status-live">
+          <div class="live-dot"></div>
+          <span>SISTEMA ATIVO</span>
+        </div>
+      </div>
+      
+      <div class="header-stats">
+        <div class="header-stat">
+          <div class="header-stat-label">Lucro Hoje</div>
+          <div class="header-stat-value" id="profitToday">+R$ 0</div>
+        </div>
+        <div class="header-stat">
+          <div class="header-stat-label">Win Rate</div>
+          <div class="header-stat-value" id="winRateHeader">0%</div>
+        </div>
+        <div class="header-stat">
+          <div class="header-stat-label">Última Análise</div>
+          <div class="header-stat-value" id="lastAnalysis" style="font-size: 14px;">--</div>
+        </div>
+      </div>
+    </header>
+    
+    <!-- Main Grid -->
+    <div class="main-grid">
+      <!-- Performance Panel -->
+      <div class="performance-panel">
+        <div class="panel-title">⚡ PERFORMANCE</div>
+        
+        <div class="perf-metric">
+          <div class="perf-label">Lucro Acumulado</div>
+          <div class="perf-value positive" id="totalProfit">+R$ 0,00</div>
+          <div class="perf-change" id="roi">ROI: 0%</div>
+        </div>
+        
+        <div class="perf-metric">
+          <div class="perf-label">Trades Realizados</div>
+          <div class="perf-value" style="color: var(--accent-cyan)" id="totalTrades">0</div>
+          <div class="perf-change">
+            <span style="color: var(--accent-green)" id="wins">0 WIN</span> / 
+            <span style="color: var(--accent-red)" id="losses">0 LOSS</span>
+          </div>
+        </div>
+        
+        <div class="perf-metric">
+          <div class="perf-label">Taxa de Acerto</div>
+          <div class="perf-value positive" id="winRate">0%</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="winRateBar" style="width: 0%"></div>
+          </div>
+        </div>
+        
+        <div class="perf-metric">
+          <div class="perf-label">Profit Factor</div>
+          <div class="perf-value" style="color: var(--accent-purple)" id="profitFactor">--</div>
+          <div class="perf-change">Ideal: > 2.0</div>
+        </div>
+        
+        <div class="perf-metric">
+          <div class="perf-label">Sinais Hoje</div>
+          <div class="perf-value" style="color: var(--accent-orange)" id="signalsToday">0</div>
+          <div class="perf-change">Esperado: 8-12/dia</div>
+        </div>
+      </div>
+      
+      <!-- Chart Panel -->
+      <div class="chart-panel">
+        <div class="panel-title">📈 EVOLUÇÃO DA BANCA</div>
+        <div class="chart-container">
+          <canvas id="equityChart"></canvas>
+        </div>
+      </div>
+      
+      <!-- Activity Log -->
+      <div class="activity-panel">
+        <div class="panel-title">🔴 LOG EM TEMPO REAL</div>
+        <div id="activityLog"></div>
+      </div>
+    </div>
+    
+    <!-- Signals Section -->
+    <div style="margin-bottom: 15px;">
+      <div class="panel-title" style="background: var(--bg-panel); border: 1px solid var(--border); padding: 15px 20px;">
+        🎯 ÚLTIMOS SINAIS
+      </div>
+    </div>
+    
+    <div class="signals-grid" id="signalsGrid">
+      <!-- Signals will be inserted here -->
+    </div>
+    
+    <!-- Market Monitor -->
+    <div style="margin-bottom: 15px;">
+      <div class="panel-title" style="background: var(--bg-panel); border: 1px solid var(--border); padding: 15px 20px;">
+        📊 MOEDAS MONITORADAS (TEMPO REAL)
+      </div>
+    </div>
+    
+    <div class="market-monitor">
+      <div class="market-grid" id="marketGrid"></div>
+    </div>
+    
+    <!-- Analysis Log -->
+    <div style="margin-top: 15px;">
+      <div class="panel-title" style="background: var(--bg-panel); border: 1px solid var(--border); padding: 15px 20px;">
+        🔍 CONSOLE DE ANÁLISE
+      </div>
+    </div>
+    
+    <div class="analysis-log">
+      <div id="analysisLog"></div>
+    </div>
+  </div>
+  
+  <script>
+    // Estado global
+    let state = {
+      balance: 1000,
+      signals: [],
+      marketData: {},
+      stats: {
+        totalProfit: 0,
+        totalTrades: 0,
+        wins: 0,
+        losses: 0,
+        signalsToday: 0
+      },
+      equityHistory: [1000]
+    };
+    
+    // Inicializar gráfico
+    const ctx = document.getElementById('equityChart').getContext('2d');
+    const equityChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['Início'],
+        datasets: [{
+          label: 'Banca (R$)',
+          data: [1000],
+          borderColor: '#00ff41',
+          backgroundColor: 'rgba(0, 255, 65, 0.1)',
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            grid: {
+              color: '#2a2a2a'
+            },
+            ticks: {
+              color: '#999999',
+              callback: function(value) {
+                return 'R$ ' + value.toFixed(0);
+              }
+            }
+          },
+          x: {
+            grid: {
+              color: '#2a2a2a'
+            },
+            ticks: {
+              color: '#999999'
+            }
+          }
+        }
+      }
+    });
+    
+    // Adicionar log de atividade
+    function addActivityLog(message, type = 'info') {
+      const logContainer = document.getElementById('activityLog');
+      const time = new Date().toLocaleTimeString('pt-BR');
+      
+      const logItem = document.createElement('div');
+      logItem.className = `activity-item ${type}`;
+      logItem.innerHTML = `
+        <div class="activity-time">${time}</div>
+        <div class="activity-content">${message}</div>
+      `;
+      
+      logContainer.insertBefore(logItem, logContainer.firstChild);
+      
+      if (logContainer.children.length > 50) {
+        logContainer.removeChild(logContainer.lastChild);
+      }
+    }
+    
+    // Adicionar log de análise
+    function addAnalysisLog(message, type = 'info') {
+      const logContainer = document.getElementById('analysisLog');
+      const time = new Date().toLocaleTimeString('pt-BR');
+      
+      const logEntry = document.createElement('div');
+      logEntry.className = `log-entry ${type}`;
+      logEntry.innerHTML = `
+        <span class="log-time">[${time}]</span>
+        <span class="log-message">${message}</span>
+      `;
+      
+      logContainer.insertBefore(logEntry, logContainer.firstChild);
+      
+      if (logContainer.children.length > 100) {
+        logContainer.removeChild(logContainer.lastChild);
+      }
+    }
+    
+    // Atualizar estatísticas
+    function updateStats() {
+      const winRate = state.stats.totalTrades > 0 
+        ? ((state.stats.wins / state.stats.totalTrades) * 100).toFixed(1)
+        : 0;
+      
+      const roi = ((state.balance - 1000) / 1000 * 100).toFixed(2);
+      
+      const avgWin = state.stats.wins > 0 
+        ? state.signals.filter(s => s.result === 'WIN').reduce((sum, s) => sum + s.profit, 0) / state.stats.wins
+        : 0;
+      
+      const avgLoss = state.stats.losses > 0
+        ? Math.abs(state.signals.filter(s => s.result === 'LOSS').reduce((sum, s) => sum + s.profit, 0) / state.stats.losses)
+        : 0;
+      
+      const profitFactor = avgLoss > 0 ? (avgWin * state.stats.wins / (avgLoss * state.stats.losses)).toFixed(2) : '--';
+      
+      document.getElementById('totalPr
