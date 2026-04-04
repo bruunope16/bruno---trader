@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Bruno Trader AI</title>
+
+<style>
+
+body{
+background:#0b0f1a;
+color:white;
+font-family:Arial;
+padding:20px;
+}
+
+.header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:20px;
+}
+
+.logo{
+font-size:22px;
+font-weight:bold;
+color:#22c55e;
+}
+
+.card{
+background:#111827;
+padding:20px;
+border-radius:10px;
+margin-bottom:20px;
+}
+
+.stats{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+gap:15px;
+}
+
+.stat{
+background:#020617;
+padding:15px;
+border-radius:8px;
+text-align:center;
+}
+
+button{
+background:#22c55e;
+border:none;
+padding:10px 20px;
+border-radius:6px;
+cursor:pointer;
+font-weight:bold;
+}
+
+.signal{
+margin-top:20px;
+padding:15px;
+border-radius:8px;
+}
+
+.buy{
+background:#064e3b;
+}
+
+.sell{
+background:#7f1d1d;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+
+<div class="logo">
+Bruno Trader AI
+</div>
+
+<button onclick="generateSignal()">
+Gerar Sinal
+</button>
+
+</div>
+
+<div class="stats">
+
+<div class="stat">
+Total
+<h2 id="total">0</h2>
+</div>
+
+<div class="stat">
+Wins
+<h2 id="wins">0</h2>
+</div>
+
+<div class="stat">
+Loss
+<h2 id="loss">0</h2>
+</div>
+
+<div class="stat">
+Win Rate
+<h2 id="winrate">0%</h2>
+</div>
+
+</div>
+
+<div class="card">
+
+<h3>Sinal da IA</h3>
+
+<div id="signalBox">
+Aguardando sinal...
+</div>
+
+</div>
+
+<script>
+
+const state = {
+total:0,
+wins:0,
+loss:0
+}
+
+function updateStats(){
+
+const winrate = state.total > 0
+? ((state.wins / state.total) * 100).toFixed(1)
+: 0
+
+document.getElementById("total").innerText = state.total
+document.getElementById("wins").innerText = state.wins
+document.getElementById("loss").innerText = state.loss
+document.getElementById("winrate").innerText = winrate + "%"
+
+}
+
+function generateSignal(){
+
+const pairs = [
+"BTC/USDT",
+"ETH/USDT",
+"EUR/USD",
+"GBP/USD",
+"USD/JPY"
+]
+
+const actions = ["COMPRA","VENDA"]
+
+const pair = pairs[Math.floor(Math.random()*pairs.length)]
+const action = actions[Math.floor(Math.random()*actions.length)]
+const confidence = Math.floor(Math.random()*20)+80
+
+document.getElementById("signalBox").innerHTML = `
+<div class="signal ${action === "COMPRA" ? "buy" : "sell"}">
+<h2>${action}</h2>
+<p>${pair}</p>
+<p>Confiança IA ${confidence}%</p>
+</div>
+`
+
+simulateResult()
+
+}
+
+function simulateResult(){
+
+setTimeout(()=>{
+
+const result = Math.random() > 0.4 ? "win" : "loss"
+
+state.total++
+
+if(result === "win"){
+state.wins++
+}else{
+state.loss++
+}
+
+updateStats()
+
+},4000)
+
+}
+
+setInterval(generateSignal,10000)
+
+</script>
+
+</body>
+
+</html>
