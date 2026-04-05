@@ -46,6 +46,8 @@ let state = {
   activeOperations: [],
   closedOperations: [],
   lastAnalysis: null,
+  analysisCount: 0,
+  logs: [],
   stats: {
     signalsToday: 0,
     totalSignals: 0,
@@ -54,20 +56,32 @@ let state = {
   }
 };
 
+// Sistema de logs
+function addLog(message, type = 'info') {
+  const log = {
+    timestamp: new Date().toISOString(),
+    message,
+    type
+  };
+  state.logs.unshift(log);
+  if (state.logs.length > 200) state.logs.pop();
+  console.log(`[${type.toUpperCase()}] ${message}`);
+}
+
 // ========== FUNÇÕES TELEGRAM ==========
 async function sendTelegramNotification(message) {
   try {
-    await bot.sendMessage(CHAT_ID, message, { parse_mode: 'HTML' });
-    console.log('📱 Notificação Telegram enviada');
+    await bot.sendMessage(CHAT_ID, message);
+    addLog('Notificacao Telegram enviada', 'success');
   } catch (error) {
-    console.error('❌ Erro ao enviar Telegram:', error.message);
+    addLog(`Erro ao enviar Telegram: ${error.message}`, 'error');
   }
 }
 
 // ========== FUNÇÕES API COINGECKO ==========
 async function loadMarketData() {
   try {
-    console.log('📡 Buscando preços da CoinGecko...');
+    addLog('Buscando precos da CoinGecko...', 'info');
     
     const coinIds = Object.keys(COINS);
     const batchSize = 25;
@@ -78,6 +92,7 @@ async function loadMarketData() {
     }
     
     state.marketData = {};
+    let totalFetched = 0;
     
     for (const batch of batches) {
       const ids = batch.join(',');
@@ -89,7 +104,7 @@ async function loadMarketData() {
       });
       
       if (!response.ok) {
-        console.error(`❌ Erro CoinGecko: ${response.status}`);
+        addLog(`Erro CoinGecko: ${response.status}`, 'error');
         continue;
       }
       
@@ -102,6 +117,7 @@ async function loadMarketData() {
             change24h: (data[coinId].usd_24h_change || 0).toFixed(2),
             volume: ((data[coinId].usd_24h_vol || 0) / 1000000000).toFixed(2)
           };
+          totalFetched++;
         }
       }
       
@@ -110,10 +126,10 @@ async function loadMarketData() {
       }
     }
     
-    console.log(`✅ ${Object.keys(state.marketData).length} moedas atualizadas`);
+    addLog(`${totalFetched} moedas atualizadas com sucesso`, 'success');
     return true;
   } catch (error) {
-    console.error('❌ Erro ao buscar preços:', error.message);
+    addLog(`Erro ao buscar precos: ${error.message}`, 'error');
     return false;
   }
 }
@@ -126,11 +142,11 @@ function checkSetup(pair, data) {
   const volatility = Math.abs(change24h);
   
   if (volatility < ROBOT_CONFIG.volatilityMin || volatility > ROBOT_CONFIG.volatilityMax) {
-    return { valid: false, reason: 'Volatilidade fora' };
+    return { valid: false, reason: `Volatilidade ${volatility.toFixed(1)}% (mín: ${ROBOT_CONFIG.volatilityMin}%)` };
   }
   
   if (volume24h < ROBOT_CONFIG.minVolume) {
-    return { valid: false, reason: 'Volume baixo' };
+    return { valid: false, reason: `Volume ${(volume24h/1000000).toFixed(0)}M (mín: ${ROBOT_CONFIG.minVolume/1000000}M)` };
   }
   
   const indicators = {
@@ -146,13 +162,13 @@ function checkSetup(pair, data) {
   const confirmed = Object.values(indicators).filter(Boolean).length;
   
   if (confirmed < ROBOT_CONFIG.minConfirmations) {
-    return { valid: false, reason: `Poucas confirmações (${confirmed})` };
+    return { valid: false, reason: `Confirmações ${confirmed}/7 (mín: ${ROBOT_CONFIG.minConfirmations})` };
   }
   
   const score = Math.floor((confirmed / 7) * 100);
   
   if (score < ROBOT_CONFIG.minScore) {
-    return { valid: false, reason: `Score baixo (${score}%)` };
+    return { valid: false, reason: `Score ${score}% (mín: ${ROBOT_CONFIG.minScore}%)` };
   }
   
   if (!indicators.choch && !indicators.orderBlock) {
@@ -200,60 +216,80 @@ function checkSetup(pair, data) {
 
 async function analyzeMarket() {
   try {
-    console.log('\n🔍 Iniciando análise de mercado...');
+    state.analysisCount++;
+    addLog(`Iniciando analise #${state.analysisCount}...`, 'info');
     
-    await loadMarketData();
+    const success = await loadMarketData();
+    
+    if (!success) {
+      addLog('Falha ao carregar dados do mercado', 'warning');
+      return;
+    }
     
     const potentialSignals = [];
+    const rejections = {};
     
     for (const [pair, data] of Object.entries(state.marketData)) {
       const setup = checkSetup(pair, data);
       
       if (setup.valid && state.activeOperations.length < ROBOT_CONFIG.maxPositions) {
         potentialSignals.push(setup);
+        addLog(`${pair}: APROVADO! Ranking ${setup.ranking}/110`, 'success');
+      } else if (!setup.valid) {
+        const reason = setup.reason;
+        rejections[reason] = (rejections[reason] || 0) + 1;
       }
+    }
+    
+    // Log de rejeições agrupadas
+    const totalPairs = Object.keys(state.marketData).length;
+    addLog(`Analisadas: ${totalPairs} moedas`, 'info');
+    
+    for (const [reason, count] of Object.entries(rejections)) {
+      addLog(`${reason}: ${count} moedas`, 'warning');
     }
     
     if (potentialSignals.length > 0) {
       const ranked = potentialSignals.sort((a, b) => b.ranking - a.ranking);
       const best = ranked[0];
       
-      console.log(`✅ SINAL ENCONTRADO: ${best.pair} ${best.direction} - Ranking ${best.ranking}/110`);
+      addLog(`SINAL ELITE ENCONTRADO: ${best.pair} ${best.direction}`, 'success');
+      addLog(`Ranking: ${best.ranking}/110 | Score: ${best.strength}% | Setup: ${best.setup}`, 'success');
       
       state.signals.unshift(best);
       state.signals = state.signals.slice(0, 10);
       state.stats.signalsToday++;
       state.stats.totalSignals++;
       
-      const message = `
-🎯 <b>SINAL ELITE DETECTADO!</b>
+      const message = `SINAL ELITE DETECTADO!
 
-<b>Par:</b> ${best.pair}
-<b>Direção:</b> ${best.direction}
-<b>Entrada:</b> $${best.entry}
-<b>Stop Loss:</b> $${best.stopLoss}
-<b>TP2:</b> $${best.tp2}
+Par: ${best.pair}
+Direcao: ${best.direction}
+Entrada: $${best.entry}
+Stop Loss: $${best.stopLoss}
+TP2: $${best.tp2}
 
-<b>Ranking:</b> ${best.ranking}/110 ⭐
-<b>Score:</b> ${best.strength}%
-<b>Confirmações:</b> ${best.confirmed}/7
-<b>Volatilidade:</b> ${best.volatility}%
-<b>Setup:</b> ${best.setup}
+Ranking: ${best.ranking}/110
+Score: ${best.strength}%
+Confirmacoes: ${best.confirmed}/7
+Volatilidade: ${best.volatility}%
+Setup: ${best.setup}
 
-💰 <b>Sugestão de Posição:</b> R$ ${(state.banca * ROBOT_CONFIG.riskPerTrade * ROBOT_CONFIG.leverage).toFixed(2)}
+Sugestao de Posicao: R$ ${(state.banca * ROBOT_CONFIG.riskPerTrade * ROBOT_CONFIG.leverage).toFixed(2)}
 
-⏰ ${new Date().toLocaleTimeString('pt-BR')}
-      `.trim();
+Horario: ${new Date().toLocaleTimeString('pt-BR')}`;
       
       await sendTelegramNotification(message);
       
-      state.lastAnalysis = new Date();
     } else {
-      console.log('ℹ️ Nenhum sinal ELITE encontrado neste ciclo');
+      addLog(`Nenhum sinal ELITE encontrado (0/${totalPairs})`, 'info');
     }
     
+    state.lastAnalysis = new Date();
+    addLog(`Proxima analise em 3 minutos`, 'info');
+    
   } catch (error) {
-    console.error('❌ Erro na análise:', error.message);
+    addLog(`Erro critico na analise: ${error.message}`, 'error');
   }
 }
 
@@ -271,6 +307,7 @@ app.get('/api/status', (req, res) => {
     marketData: Object.keys(state.marketData).length,
     signals: state.stats.signalsToday,
     lastAnalysis: state.lastAnalysis,
+    analysisCount: state.analysisCount,
     stats: state.stats
   });
 });
@@ -289,6 +326,28 @@ app.get('/api/market', (req, res) => {
   });
 });
 
+app.get('/api/logs', (req, res) => {
+  res.json({
+    logs: state.logs.slice(0, 100),
+    count: state.logs.length
+  });
+});
+
+app.get('/api/debug', (req, res) => {
+  res.json({
+    config: ROBOT_CONFIG,
+    state: {
+      banca: state.banca,
+      signalsCount: state.signals.length,
+      marketDataCount: Object.keys(state.marketData).length,
+      analysisCount: state.analysisCount,
+      lastAnalysis: state.lastAnalysis,
+      stats: state.stats
+    },
+    logs: state.logs.slice(0, 20)
+  });
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
@@ -296,28 +355,47 @@ app.get('/health', (req, res) => {
 
 // ========== INICIALIZAÇÃO ==========
 app.listen(PORT, async () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`📱 Notificações Telegram configuradas`);
-  console.log(`🤖 Bruno Trader ATIVO 24/7!`);
+  addLog('Servidor inicializado', 'success');
+  addLog(`Porta: ${PORT}`, 'info');
+  addLog('Telegram configurado', 'success');
+  addLog('Filtro ELITE ativo', 'info');
   
-  await sendTelegramNotification(`
-🚀 <b>BRUNO TRADER INICIADO!</b>
+  await sendTelegramNotification(`BRUNO TRADER PRO INICIADO!
 
-✅ Servidor online e rodando 24/7
-🔍 Monitorando 50 criptomoedas
-💎 Filtro ELITE ativo
-📊 Análise a cada 3 minutos
+Servidor online e rodando 24/7
+Monitorando 50 criptomoedas
+Filtro ELITE ativo
+Analise a cada 3 minutos
 
-Você receberá notificações quando houver sinais!
+Sistema com logs em tempo real ativado!
 
-⏰ ${new Date().toLocaleString('pt-BR')}
-  `.trim());
+Horario: ${new Date().toLocaleString('pt-BR')}`);
   
-  setTimeout(analyzeMarket, 5000);
-  setInterval(loadMarketData, 10000);
-  setInterval(analyzeMarket, 180000);
+  // Primeira análise após 10 segundos
+  setTimeout(() => {
+    addLog('Iniciando primeira analise...', 'info');
+    analyzeMarket();
+  }, 10000);
+  
+  // Atualizar preços a cada 30 segundos (economia de API)
+  setInterval(() => {
+    addLog('Atualizando precos...', 'info');
+    loadMarketData();
+  }, 30000);
+  
+  // Analisar mercado a cada 3 minutos
+  setInterval(() => {
+    addLog('Ciclo de analise agendado', 'info');
+    analyzeMarket();
+  }, 180000);
+  
+  // Heartbeat a cada 30 segundos
+  setInterval(() => {
+    addLog(`Heartbeat - Sistema operacional | Analises: ${state.analysisCount} | Sinais: ${state.stats.totalSignals}`, 'info');
+  }, 30000);
 });
 
 process.on('unhandledRejection', (error) => {
-  console.error('❌ Erro não tratado:', error);
+  addLog(`Erro nao tratado: ${error.message}`, 'error');
 });
+                                                
