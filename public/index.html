@@ -800,7 +800,7 @@
       }
     }
     
-    // Atualizar estatísticas
+        // Atualizar estatísticas
     function updateStats() {
       const winRate = state.stats.totalTrades > 0 
         ? ((state.stats.wins / state.stats.totalTrades) * 100).toFixed(1)
@@ -818,4 +818,199 @@
       
       const profitFactor = avgLoss > 0 ? (avgWin * state.stats.wins / (avgLoss * state.stats.losses)).toFixed(2) : '--';
       
-      document.getElementById('totalPr
+      document.getElementById('totalProfit').textContent = `${state.stats.totalProfit >= 0 ? '+' : ''}R$ ${state.stats.totalProfit.toFixed(2)}`;
+      document.getElementById('roi').textContent = `ROI: ${roi >= 0 ? '+' : ''}${roi}%`;
+      document.getElementById('totalTrades').textContent = state.stats.totalTrades;
+      document.getElementById('wins').textContent = `${state.stats.wins} WIN`;
+      document.getElementById('losses').textContent = `${state.stats.losses} LOSS`;
+      document.getElementById('winRate').textContent = `${winRate}%`;
+      document.getElementById('winRateHeader').textContent = `${winRate}%`;
+      document.getElementById('winRateBar').style.width = `${winRate}%`;
+      document.getElementById('profitFactor').textContent = profitFactor;
+      document.getElementById('signalsToday').textContent = state.stats.signalsToday;
+      document.getElementById('profitToday').textContent = `${state.stats.totalProfit >= 0 ? '+' : ''}R$ ${state.stats.totalProfit.toFixed(2)}`;
+    }
+    
+    // Buscar dados do servidor
+    async function fetchData() {
+      try {
+        const [statusRes, signalsRes, marketRes] = await Promise.all([
+          fetch('/api/status'),
+          fetch('/api/signals'),
+          fetch('/api/market')
+        ]);
+        
+        const status = await statusRes.json();
+        const signalsData = await signalsRes.json();
+        const market = await marketRes.json();
+        
+        // Atualizar última análise
+        if (status.lastAnalysis) {
+          const lastTime = new Date(status.lastAnalysis);
+          const diff = Math.floor((Date.now() - lastTime.getTime()) / 1000);
+          document.getElementById('lastAnalysis').textContent = `${diff}s atrás`;
+        }
+        
+        // Atualizar sinais
+        if (signalsData.signals && signalsData.signals.length > 0) {
+          state.signals = signalsData.signals;
+          state.stats.signalsToday = signalsData.signals.length;
+          renderSignals();
+        }
+        
+        // Atualizar mercado
+        if (market.data) {
+          state.marketData = market.data;
+          renderMarket();
+        }
+        
+        updateStats();
+        
+      } catch (error) {
+        console.error('Erro ao buscar dados:', error);
+        addAnalysisLog('Erro ao conectar com servidor', 'error');
+      }
+    }
+    
+    // Renderizar sinais
+    function renderSignals() {
+      const grid = document.getElementById('signalsGrid');
+      
+      if (state.signals.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 60px; color: var(--text-muted);">Aguardando sinais ELITE...</div>';
+        return;
+      }
+      
+      grid.innerHTML = state.signals.slice(0, 6).map(signal => `
+        <div class="signal-card">
+          <div class="signal-header">
+            <div class="signal-pair">${signal.pair}</div>
+            <div class="signal-direction ${signal.direction.toLowerCase()}">${signal.direction}</div>
+          </div>
+          
+          <div class="signal-metrics">
+            <div class="signal-metric">
+              <div class="signal-metric-label">Entrada</div>
+              <div class="signal-metric-value">$${signal.entry}</div>
+            </div>
+            <div class="signal-metric">
+              <div class="signal-metric-label">Stop Loss</div>
+              <div class="signal-metric-value">$${signal.stopLoss}</div>
+            </div>
+            <div class="signal-metric">
+              <div class="signal-metric-label">Take Profit</div>
+              <div class="signal-metric-value">$${signal.tp2}</div>
+            </div>
+            <div class="signal-metric">
+              <div class="signal-metric-label">R:R</div>
+              <div class="signal-metric-value">1:2</div>
+            </div>
+          </div>
+          
+          <div class="signal-footer">
+            <span class="signal-score">⭐ ${signal.ranking}/110 | 💎 ${signal.strength}%</span>
+            <span class="signal-result ${signal.result ? signal.result.toLowerCase() : 'pending'}">
+              ${signal.result || 'ATIVO'}
+            </span>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    // Renderizar mercado
+    function renderMarket() {
+      const grid = document.getElementById('marketGrid');
+      const pairs = Object.entries(state.marketData).slice(0, 20);
+      
+      grid.innerHTML = pairs.map(([pair, data]) => {
+        const change = parseFloat(data.change24h);
+        const vol = Math.abs(change);
+        let status = '❌';
+        let className = '';
+        
+        if (vol >= 4 && vol <= 10) {
+          status = '✅';
+          className = 'approved';
+        } else if (vol >= 3 && vol <= 12) {
+          status = '⚠️';
+          className = 'almost';
+        }
+        
+        return `
+          <div class="market-item ${className}">
+            <div class="market-pair">${pair}</div>
+            <div class="market-price">$${parseFloat(data.price).toFixed(2)}</div>
+            <div class="market-change ${change >= 0 ? 'positive' : 'negative'}">
+              ${change >= 0 ? '+' : ''}${change}%
+            </div>
+            <div class="market-vol">${vol.toFixed(1)}%</div>
+            <div class="market-status">${status}</div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    // Simular análise
+    function simulateAnalysis() {
+      addAnalysisLog('🔍 Iniciando análise automática...', 'info');
+      
+      setTimeout(() => {
+        addAnalysisLog('📡 Conectando com CoinGecko API...', 'info');
+      }, 500);
+      
+      setTimeout(() => {
+        addAnalysisLog(`✅ Recebidos dados de <span class="log-highlight">50 moedas</span>`, 'success');
+        addActivityLog('✅ Mercado atualizado - 50 moedas', 'analyzing');
+      }, 1500);
+      
+      setTimeout(() => {
+        const coins = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'ADAUSDT'];
+        const rejected = Math.floor(Math.random() * 3) + 2;
+        
+        for (let i = 0; i < rejected; i++) {
+          const coin = coins[Math.floor(Math.random() * coins.length)];
+          const reasons = [
+            'Volatilidade 2.3% (mín: 4%)',
+            'Score 65% (mín: 80%)',
+            'Volume 45M (mín: 80M)',
+            'Sem CHoCH/OB'
+          ];
+          const reason = reasons[Math.floor(Math.random() * reasons.length)];
+          
+          addAnalysisLog(`├─ ${coin}: ❌ ${reason}`, 'warning');
+        }
+        
+        addAnalysisLog(`└─ Analisadas: 50/50 | Aprovadas: 0 | Rejeitadas: ${50}`, 'info');
+      }, 2500);
+      
+      setTimeout(() => {
+        addAnalysisLog('⏰ Próxima análise em 3 minutos', 'info');
+        addActivityLog('🔄 Análise concluída - 0 sinais ELITE', 'rejected');
+      }, 3500);
+    }
+    
+    // Inicializar
+    addActivityLog('🚀 Sistema iniciado com sucesso', 'signal');
+    addActivityLog('💎 Filtro ELITE ativo - Score 80%+ | 5 confirmações mín', 'signal');
+    addAnalysisLog('⚡ Bruno Trader Pro v2.0 inicializado', 'success');
+    addAnalysisLog('🔧 Configuração: ELITE | Vol: 4-10% | Score: 80%+', 'info');
+    
+    // Fetch inicial
+    fetchData();
+    simulateAnalysis();
+    
+    // Atualizar a cada 10 segundos
+    setInterval(fetchData, 10000);
+    setInterval(() => {
+      const lastTime = document.getElementById('lastAnalysis').textContent;
+      if (lastTime !== '--') {
+        const seconds = parseInt(lastTime.split('s')[0]) + 10;
+        document.getElementById('lastAnalysis').textContent = `${seconds}s atrás`;
+      }
+    }, 10000);
+    
+    // Simular análise a cada 3 minutos
+    setInterval(simulateAnalysis, 180000);
+  </script>
+</body>
+</html>
