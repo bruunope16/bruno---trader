@@ -1,20 +1,20 @@
 {
-  "name": "bruno-trader-render",
-  "version": "1.0.0",
-  "description": "Bruno Crypto Trader - Sistema de sinais elite com notificações Telegram",
+  "name": "bruno-trader-pro",
+  "version": "2.0.0",
+  "description": "Robo de Trading Profissional com Binance API e Analise Tecnica Real",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
-  },
-  "engines": {
-    "node": "18.x"
+    "start": "node server.js",
+    "backtest": "node backtest.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "node-fetch": "^2.7.0",
-    "node-telegram-bot-api": "^0.64.0"
+    "node-telegram-bot-api": "^0.64.0",
+    "node-binance-api": "^0.13.1",
+    "technicalindicators": "^3.1.0",
+    "nodemailer": "^6.9.7"
   },
-  "keywords": ["crypto", "trading", "telegram", "bot"],
-  "author": "Bruno",
-  "license": "MIT"
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
