@@ -1,5 +1,5 @@
 const express = require('express');
-const Binance = require('node-binance-api');
+const axios = require('axios');
 const TelegramBot = require('node-telegram-bot-api');
 const { RSI, MACD, BollingerBands, EMA, ATR } = require('technicalindicators');
 const path = require('path');
@@ -8,9 +8,6 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 const TELEGRAM_TOKEN = '8604695024:AAEycHa9v4L2ZmOBxP20i9ZuBSmE1hNndxM';
 const CHAT_ID = '1763009688';
-
-// Binance API (sem chaves = dados públicos)
-const binance = new Binance();
 
 // Telegram Bot
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: false });
@@ -84,21 +81,40 @@ async function sendTelegram(message) {
   }
 }
 
-// ========== BINANCE - DADOS REAIS ==========
+// ========== BINANCE API - CHAMADAS DIRETAS COM AXIOS ==========
 async function getCandlesticks(symbol, interval = '1h', limit = 100) {
   try {
-    const candles = await binance.candlesticks(symbol, interval, false, { limit });
+    const url = `https://api.binance.com/api/v3/klines`;
+    const response = await axios.get(url, {
+      params: {
+        symbol: symbol,
+        interval: interval,
+        limit: limit
+      },
+      timeout: 10000
+    });
     
-    return candles.map(c => ({
-      time: c[0],
-      open: parseFloat(c[1]),
-      high: parseFloat(c[2]),
-      low: parseFloat(c[3]),
-      close: parseFloat(c[4]),
-      volume: parseFloat(c[5])
+    if (!response.data || response.data.length === 0) {
+      addLog(`${symbol}: Sem dados retornados`, 'warning');
+      return null;
+    }
+    
+    return response.data.map(candle => ({
+      time: candle[0],
+      open: parseFloat(candle[1]),
+      high: parseFloat(candle[2]),
+      low: parseFloat(candle[3]),
+      close: parseFloat(candle[4]),
+      volume: parseFloat(candle[5])
     }));
   } catch (error) {
-    addLog(`Erro ao buscar velas ${symbol}: ${error.message}`, 'error');
+    if (error.code === 'ECONNABORTED') {
+      addLog(`${symbol}: Timeout na API`, 'warning');
+    } else if (error.response) {
+      addLog(`${symbol}: Erro API ${error.response.status}`, 'warning');
+    } else {
+      addLog(`${symbol}: ${error.message}`, 'warning');
+    }
     return null;
   }
 }
@@ -514,5 +530,3 @@ ${new Date().toLocaleString('pt-BR')}`);
 process.on('unhandledRejection', (error) => {
   addLog(`Erro: ${error.message}`, 'error');
 });
-
-  
