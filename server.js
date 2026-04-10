@@ -24,7 +24,7 @@ const CONFIG = {
   maxPositions: 5,           // Máximo 5 posições simultâneas
   
   // Filtros
-  minVolume24h: 50000000,    // 50M USD mínimo
+  minVolume24h: 10000000,    // 10M USD mínimo (ajustado)
   minRSI: 30,                // RSI mínimo (oversold)
   maxRSI: 70,                // RSI máximo (overbought)
   
@@ -315,10 +315,13 @@ async function analyzeSymbol(symbol) {
     const ind15m = calculateIndicators(candles15m);
     
     // Volume 24h
-    const volume24h = candles1h.slice(-24).reduce((sum, c) => sum + c.volume * c.close, 0);
+    const volume24h = candles1h.slice(-24).reduce((sum, c) => sum + (c.volume * c.close), 0);
     
-    // Filtro de volume
-    if (volume24h < CONFIG.minVolume24h) {
+    // Log de debug
+    addLog(`${symbol}: Volume 24h = ${(volume24h/1000000).toFixed(1)}M USD`, 'info');
+    
+    // Filtro de volume (relaxado se volume = 0)
+    if (volume24h > 0 && volume24h < CONFIG.minVolume24h) {
       return { valid: false, reason: `Volume baixo: ${(volume24h/1000000).toFixed(0)}M` };
     }
     
