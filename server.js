@@ -1,4 +1,4 @@
-const express = require('express');
+ const express = require('express');
 const axios = require('axios');
 const TelegramBot = require('node-telegram-bot-api');
 const { RSI, MACD, BollingerBands, EMA, ATR } = require('technicalindicators');
@@ -45,6 +45,7 @@ let state = {
   balance: CONFIG.initialBalance,
   signals: [],
   trades: [],
+  pendingTrades: [], // Novos trades aguardando resultado
   stats: {
     totalTrades: 0,
     wins: 0,
@@ -78,6 +79,179 @@ async function sendTelegram(message) {
     addLog('Telegram enviado', 'success');
   } catch (error) {
     addLog(`Erro Telegram: ${error.message}`, 'error');
+  }
+}
+
+// ========== TRACKING DE RESULTADOS ==========
+async function checkTradeResults() {
+  try {
+    if (state.pendingTrades.length === 0) return;
+    
+    addLog(`Verificando ${state.pendingTrades.length} trades pendentes...`, 'info');
+    
+    for (let i = state.pendingTrades.length - 1; i >= 0; i--) {
+      const trade = state.pendingTrades[i];
+      
+      // Verifica se já passou tempo suficiente (4 horas)
+      const timeSince = Date.now() - new Date(trade.timestamp).getTime();
+      const hoursSince = timeSince / (1000 * 60 * 60);
+      
+      if (hoursSince < 4) continue; // Ainda não passou 4h
+      
+      // Busca preço atual
+      const candles = await getCandlesticks(trade.symbol, '1h', 1);
+      if (!candles || candles.length === 0) continue;
+      
+      const currentPrice = candles[0].close;
+      const entry = parseFloat(trade.entry);
+      const stop = parseFloat(trade.stopLoss);
+      const tp1 = parseFloat(trade.tp1);
+      const tp2 = parseFloat(trade.tp2);
+      
+      let result = null;
+      
+      if (trade.direction === 'LONG') {
+        // Verifica se bateu TP2
+        if (currentPrice >= tp2) {
+          result = {
+            outcome: 'WIN',
+            exit: tp2,
+            profit: ((tp2 - entry) / entry) * 100,
+            level: 'TP2'
+          };
+        }
+        // Verifica se bateu TP1
+        else if (currentPrice >= tp1) {
+          result = {
+            outcome: 'WIN',
+            exit: tp1,
+            profit: ((tp1 - entry) / entry) * 100,
+            level: 'TP1'
+          };
+        }
+        // Verifica se bateu Stop
+        else if (currentPrice <= stop) {
+          result = {
+            outcome: 'LOSS',
+            exit: stop,
+            profit: ((stop - entry) / entry) * 100,
+            level: 'STOP'
+          };
+        }
+        // Ainda em andamento
+        else {
+          result = {
+            outcome: 'NEUTRAL',
+            exit: currentPrice,
+            profit: ((currentPrice - entry) / entry) * 100,
+            level: 'EM ANDAMENTO'
+          };
+        }
+      } else { // SHORT
+        // Verifica se bateu TP2
+        if (currentPrice <= tp2) {
+          result = {
+            outcome: 'WIN',
+            exit: tp2,
+            profit: ((entry - tp2) / entry) * 100,
+            level: 'TP2'
+          };
+        }
+        // Verifica se bateu TP1
+        else if (currentPrice <= tp1) {
+          result = {
+            outcome: 'WIN',
+            exit: tp1,
+            profit: ((entry - tp1) / entry) * 100,
+            level: 'TP1'
+          };
+        }
+        // Verifica se bateu Stop
+        else if (currentPrice >= stop) {
+          result = {
+            outcome: 'LOSS',
+            exit: stop,
+            profit: ((entry - stop) / entry) * 100,
+            level: 'STOP'
+          };
+        }
+        // Ainda em andamento
+        else {
+          result = {
+            outcome: 'NEUTRAL',
+            exit: currentPrice,
+            profit: ((entry - currentPrice) / entry) * 100,
+            level: 'EM ANDAMENTO'
+          };
+        }
+      }
+      
+      // Se bateu TP ou STOP, finaliza trade
+      if (result.outcome === 'WIN' || result.outcome === 'LOSS') {
+        const completedTrade = {
+          ...trade,
+          ...result,
+          closedAt: new Date().toISOString(),
+          duration: hoursSince.toFixed(1) + 'h'
+        };
+        
+        // Atualiza estatísticas
+        state.stats.totalTrades++;
+        
+        if (result.outcome === 'WIN') {
+          state.stats.wins++;
+          const profitValue = (state.balance * CONFIG.riskPerTrade) * (result.profit / 100) * CONFIG.leverage;
+          state.stats.totalProfit += profitValue;
+          state.balance += profitValue;
+        } else {
+          state.stats.losses++;
+          const lossValue = (state.balance * CONFIG.riskPerTrade);
+          state.stats.totalProfit -= lossValue;
+          state.balance -= lossValue;
+        }
+        
+        state.stats.winRate = state.stats.totalTrades > 0 
+          ? ((state.stats.wins / state.stats.totalTrades) * 100).toFixed(1)
+          : 0;
+        
+        // Salva trade finalizado
+        state.trades.unshift(completedTrade);
+        state.trades = state.trades.slice(0, 50);
+        
+        // Remove de pendentes
+        state.pendingTrades.splice(i, 1);
+        
+        // Notifica resultado
+        const emoji = result.outcome === 'WIN' ? '🟢' : '🔴';
+        const resultText = result.outcome === 'WIN' ? 'GREEN' : 'RED';
+        
+        const message = `${emoji} ${resultText}!
+
+Par: ${trade.symbol} ${trade.direction}
+Entrada: $${trade.entry}
+Saida: ${result.level} $${result.exit.toFixed(2)}
+Profit: ${result.profit > 0 ? '+' : ''}${result.profit.toFixed(2)}%
+
+Duracao: ${completedTrade.duration}
+Score: ${trade.score}/100
+
+Banca: R$ ${state.balance.toFixed(2)}
+Win Rate: ${state.stats.winRate}%
+
+${new Date().toLocaleTimeString('pt-BR')}`;
+        
+        await sendTelegram(message);
+        addLog(`${emoji} ${trade.symbol}: ${resultText} (${result.profit.toFixed(2)}%)`, result.outcome === 'WIN' ? 'success' : 'error');
+      }
+      // Se ainda em andamento após 4h, fecha neutro
+      else if (hoursSince >= 4) {
+        addLog(`${trade.symbol}: Fechando neutro após 4h (${result.profit.toFixed(2)}%)`, 'info');
+        state.pendingTrades.splice(i, 1);
+      }
+    }
+    
+  } catch (error) {
+    addLog(`Erro ao verificar resultados: ${error.message}`, 'error');
   }
 }
 
@@ -382,9 +556,27 @@ async function analyzeSymbol(symbol) {
       signals.push('15m Confirma');
     }
     
-    // Filtro mínimo: 50 pontos (ajustado)
-    if (score < 50) {
+    // Filtro mínimo: 65 pontos (score mais rigoroso)
+    if (score < 65) {
       return { valid: false, reason: `Score baixo: ${score}/100` };
+    }
+    
+    // ANTI-DUPLICAÇÃO: Verifica se já enviou sinal deste par recentemente
+    const recentSignals = state.signals.slice(0, 20);
+    const recentSame = recentSignals.find(s => s.symbol === symbol);
+    if (recentSame) {
+      const timeSince = Date.now() - new Date(recentSame.timestamp).getTime();
+      const hoursSince = timeSince / (1000 * 60 * 60);
+      
+      if (hoursSince < 4) { // 4 horas de intervalo mínimo
+        return { valid: false, reason: `${symbol} sinal recente (${hoursSince.toFixed(1)}h atrás)` };
+      }
+      
+      // Verifica se preço mudou pelo menos 1%
+      const priceDiff = Math.abs(ind1h.price - parseFloat(recentSame.entry)) / parseFloat(recentSame.entry);
+      if (priceDiff < 0.01) { // 1% de variação mínima
+        return { valid: false, reason: `${symbol} preço similar ao último sinal` };
+      }
     }
     
     // Determina direção
@@ -460,44 +652,45 @@ async function analyzeMarket() {
     // Ordena por score
     results.sort((a, b) => b.score - a.score);
     
-    // Pega os 3 melhores
-    const topSignals = results.slice(0, 3);
+    // Pega APENAS O MELHOR (1 sinal por ciclo)
+    const topSignals = results.slice(0, 1);
     
     if (topSignals.length > 0) {
-      // Salva sinais
-      topSignals.forEach(signal => {
-        state.signals.unshift(signal);
-      });
+      // Salva sinal
+      const bestSignal = topSignals[0];
+      state.signals.unshift(bestSignal);
       state.signals = state.signals.slice(0, 20);
       
       // Notifica no Telegram
-      for (const signal of topSignals) {
-        const message = `SINAL PROFISSIONAL DETECTADO!
+      const message = `SINAL PROFISSIONAL DETECTADO!
 
-Par: ${signal.symbol}
-Direcao: ${signal.direction}
+Par: ${bestSignal.symbol}
+Direcao: ${bestSignal.direction}
 
-Entrada: $${signal.entry}
-Stop Loss: $${signal.stopLoss}
-TP1 (50%): $${signal.tp1}
-TP2 (50%): $${signal.tp2}
+Entrada: $${bestSignal.entry}
+Stop Loss: $${bestSignal.stopLoss}
+TP1 (50%): $${bestSignal.tp1}
+TP2 (50%): $${bestSignal.tp2}
 
-R:R: 1:${signal.rr}
-Score: ${signal.score}/100
-RSI: ${signal.rsi}
-ATR: ${signal.atr}
+R:R: 1:${bestSignal.rr}
+Score: ${bestSignal.score}/100
+RSI: ${bestSignal.rsi}
+ATR: ${bestSignal.atr}
 
-Confirmacoes: ${signal.signals}
-Volume 24h: ${signal.volume24h}
+Confirmacoes: ${bestSignal.signals}
+Volume 24h: ${bestSignal.volume24h}
 
 Posicao sugerida: R$ ${(state.balance * CONFIG.riskPerTrade).toFixed(2)} (2% da banca)
 
 ${new Date().toLocaleTimeString('pt-BR')}`;
-        
-        await sendTelegram(message);
-      }
       
-      addLog(`${topSignals.length} sinais encontrados!`, 'success');
+      await sendTelegram(message);
+      
+      // Adiciona aos trades pendentes para tracking
+      state.pendingTrades.push(bestSignal);
+      
+      addLog(`MELHOR SINAL: ${bestSignal.symbol} ${bestSignal.direction} (Score: ${bestSignal.score})`, 'success');
+      addLog(`Trade adicionado para tracking (${state.pendingTrades.length} pendentes)`, 'info');
     } else {
       addLog('Nenhum sinal encontrado neste ciclo', 'info');
     }
@@ -592,6 +785,10 @@ ${new Date().toLocaleString('pt-BR')}`);
   
   // Análise a cada 15 minutos
   setInterval(analyzeMarket, 900000);
+  
+  // Verifica resultados de trades a cada 30 minutos
+  setInterval(checkTradeResults, 1800000);
+  addLog('Sistema de tracking ativado (verifica a cada 30min)', 'success');
 });
 
 process.on('unhandledRejection', (error) => {
