@@ -81,10 +81,11 @@ async function sendTelegram(message) {
   }
 }
 
-// ========== BINANCE API - CHAMADAS DIRETAS COM AXIOS ==========
+// ========== BINANCE.US + COINGECKO HÍBRIDO ==========
 async function getCandlesticks(symbol, interval = '1h', limit = 100) {
   try {
-    const url = `https://api.binance.com/api/v3/klines`;
+    // TENTA BINANCE.US PRIMEIRO
+    const url = `https://api.binance.us/api/v3/klines`;
     const response = await axios.get(url, {
       params: {
         symbol: symbol,
@@ -95,9 +96,10 @@ async function getCandlesticks(symbol, interval = '1h', limit = 100) {
     });
     
     if (!response.data || response.data.length === 0) {
-      addLog(`${symbol}: Sem dados retornados`, 'warning');
-      return null;
+      throw new Error('Sem dados');
     }
+    
+    addLog(`${symbol}: ${response.data.length} velas recebidas (Binance.US)`, 'success');
     
     return response.data.map(candle => ({
       time: candle[0],
@@ -108,13 +110,80 @@ async function getCandlesticks(symbol, interval = '1h', limit = 100) {
       volume: parseFloat(candle[5])
     }));
   } catch (error) {
-    if (error.code === 'ECONNABORTED') {
-      addLog(`${symbol}: Timeout na API`, 'warning');
-    } else if (error.response) {
-      addLog(`${symbol}: Erro API ${error.response.status}`, 'warning');
-    } else {
-      addLog(`${symbol}: ${error.message}`, 'warning');
+    // SE BINANCE.US FALHAR, USA COINGECKO
+    addLog(`${symbol}: Binance.US falhou, tentando CoinGecko...`, 'warning');
+    return await getCandlesticksFromCoinGecko(symbol, limit);
+  }
+}
+
+async function getCandlesticksFromCoinGecko(symbol, limit = 100) {
+  try {
+    // Converte símbolo: BTCUSDT -> bitcoin
+    const coinMap = {
+      'BTCUSDT': 'bitcoin',
+      'ETHUSDT': 'ethereum',
+      'BNBUSDT': 'binancecoin',
+      'SOLUSDT': 'solana',
+      'ADAUSDT': 'cardano',
+      'XRPUSDT': 'ripple',
+      'DOGEUSDT': 'dogecoin',
+      'MATICUSDT': 'matic-network',
+      'DOTUSDT': 'polkadot',
+      'AVAXUSDT': 'avalanche-2',
+      'LINKUSDT': 'chainlink',
+      'UNIUSDT': 'uniswap',
+      'ATOMUSDT': 'cosmos',
+      'LTCUSDT': 'litecoin',
+      'NEARUSDT': 'near'
+    };
+    
+    const coinId = coinMap[symbol];
+    if (!coinId) {
+      throw new Error('Moeda não mapeada');
     }
+    
+    const days = Math.ceil(limit / 24); // 1h candles
+    const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart`;
+    
+    const response = await axios.get(url, {
+      params: {
+        vs_currency: 'usd',
+        days: days,
+        interval: 'hourly'
+      },
+      timeout: 10000
+    });
+    
+    if (!response.data || !response.data.prices) {
+      throw new Error('Sem dados CoinGecko');
+    }
+    
+    // Converte formato CoinGecko para candlesticks
+    const prices = response.data.prices.slice(-limit);
+    const volumes = response.data.total_volumes.slice(-limit);
+    
+    const candles = prices.map((price, i) => {
+      const close = price[1];
+      const volume = volumes[i] ? volumes[i][1] : 0;
+      
+      // Simula OHLC a partir do preço (aproximação)
+      const variance = close * 0.002; // 0.2% de variância
+      
+      return {
+        time: price[0],
+        open: close - variance,
+        high: close + variance,
+        low: close - variance,
+        close: close,
+        volume: volume
+      };
+    });
+    
+    addLog(`${symbol}: ${candles.length} velas recebidas (CoinGecko)`, 'success');
+    return candles;
+    
+  } catch (error) {
+    addLog(`${symbol}: CoinGecko também falhou - ${error.message}`, 'error');
     return null;
   }
 }
@@ -530,3 +599,5 @@ ${new Date().toLocaleString('pt-BR')}`);
 process.on('unhandledRejection', (error) => {
   addLog(`Erro: ${error.message}`, 'error');
 });
+
+  
