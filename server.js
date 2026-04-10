@@ -314,16 +314,11 @@ async function analyzeSymbol(symbol) {
     const ind1h = calculateIndicators(candles1h);
     const ind15m = calculateIndicators(candles15m);
     
-    // Volume 24h
+    // Volume 24h (apenas informativo, não bloqueia)
     const volume24h = candles1h.slice(-24).reduce((sum, c) => sum + (c.volume * c.close), 0);
+    const volumeStr = volume24h > 1000000 ? `${(volume24h/1000000).toFixed(0)}M` : 'N/A';
     
-    // Log de debug
-    addLog(`${symbol}: Volume 24h = ${(volume24h/1000000).toFixed(1)}M USD`, 'info');
-    
-    // Filtro de volume (relaxado se volume = 0)
-    if (volume24h > 0 && volume24h < CONFIG.minVolume24h) {
-      return { valid: false, reason: `Volume baixo: ${(volume24h/1000000).toFixed(0)}M` };
-    }
+    addLog(`${symbol}: Vol 24h = ${volumeStr}`, 'info');
     
     // Detecta padrões SMC
     const orderBlock = detectOrderBlock(candles1h);
@@ -387,8 +382,8 @@ async function analyzeSymbol(symbol) {
       signals.push('15m Confirma');
     }
     
-    // Filtro mínimo: 60 pontos
-    if (score < 60) {
+    // Filtro mínimo: 50 pontos (ajustado)
+    if (score < 50) {
       return { valid: false, reason: `Score baixo: ${score}/100` };
     }
     
@@ -428,7 +423,7 @@ async function analyzeSymbol(symbol) {
       rsi: ind1h.rsi.toFixed(1),
       atr: ind1h.atr.toFixed(2),
       rr,
-      volume24h: (volume24h / 1000000).toFixed(0) + 'M',
+      volume24h: volumeStr,
       timestamp: new Date().toISOString()
     };
     
