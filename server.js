@@ -191,10 +191,13 @@ function calculateFibonacci(candles, marketStructure) {
   const { trend, lastHigh, lastLow } = marketStructure;
   const diff = lastHigh - lastLow;
   
+  // Validação: diferença mínima de 1%
+  if (diff / lastLow < 0.01) return null;
+  
   let fib = {};
   
   if (trend === 'bullish') {
-    // Retração de um movimento de alta
+    // Retração de um movimento de alta (mede de low para high)
     fib = {
       level_0: lastHigh,
       level_236: lastHigh - (diff * 0.236),
@@ -202,13 +205,13 @@ function calculateFibonacci(candles, marketStructure) {
       level_500: lastHigh - (diff * 0.500),
       level_618: lastHigh - (diff * 0.618),
       level_786: lastHigh - (diff * 0.786),
-      // Extensões
+      // Extensões para targets (acima do high)
       ext_1272: lastHigh + (diff * 0.272),
       ext_1414: lastHigh + (diff * 0.414),
       ext_1618: lastHigh + (diff * 0.618)
     };
   } else {
-    // Retração de um movimento de baixa
+    // Retração de um movimento de baixa (mede de high para low)
     fib = {
       level_0: lastLow,
       level_236: lastLow + (diff * 0.236),
@@ -216,7 +219,7 @@ function calculateFibonacci(candles, marketStructure) {
       level_500: lastLow + (diff * 0.500),
       level_618: lastLow + (diff * 0.618),
       level_786: lastLow + (diff * 0.786),
-      // Extensões
+      // Extensões para targets (abaixo do low)
       ext_1272: lastLow - (diff * 0.272),
       ext_1414: lastLow - (diff * 0.414),
       ext_1618: lastLow - (diff * 0.618)
@@ -502,6 +505,11 @@ async function analyzeSymbol(symbol) {
       return { valid: false, reason: `Poucas confluências: ${confluences.length}/4` };
     }
     
+    // FILTRO: Score mínimo de 75
+    if (confidence < 7) {
+      return { valid: false, reason: `Score muito baixo: ${confidence} (mínimo 7)` };
+    }
+    
     // ANTI-DUPLICAÇÃO
     const recentSignals = state.signals.slice(0, 20);
     const recentSame = recentSignals.find(s => s.symbol === symbol);
@@ -534,16 +542,43 @@ async function analyzeSymbol(symbol) {
     
     const rr = Math.abs(tp3 - entry) / Math.abs(entry - stop);
     
+    // VALIDAÇÕES CRÍTICAS
+    // 1. Stop não pode ser igual ou muito próximo da entrada
+    if (Math.abs(entry - stop) / entry < 0.005) { // Menos de 0.5%
+      return { valid: false, reason: 'Stop muito próximo da entrada' };
+    }
+    
+    // 2. TPs devem ser diferentes da entrada
+    if (Math.abs(tp1 - entry) / entry < 0.003 || Math.abs(tp2 - entry) / entry < 0.003) {
+      return { valid: false, reason: 'TPs muito próximos da entrada' };
+    }
+    
+    // 3. R:R mínimo de 1.5
+    if (rr < 1.5) {
+      return { valid: false, reason: `R:R muito baixo: ${rr.toFixed(2)}` };
+    }
+    
+    // 4. Verificar se TP3 está na direção correta
+    if (direction === 'LONG' && tp3 <= entry) {
+      return { valid: false, reason: 'TP3 abaixo da entrada em LONG' };
+    }
+    if (direction === 'SHORT' && tp3 >= entry) {
+      return { valid: false, reason: 'TP3 acima da entrada em SHORT' };
+    }
+    
     // Nível de confiança
     let confidenceLevel;
     if (confidence >= 8) confidenceLevel = 'ALTA';
-    else if (confidence >= 6) confidenceLevel = 'MEDIA';
+    else if (confidence >= 7) confidenceLevel = 'MEDIA';
     else confidenceLevel = 'BAIXA';
     
     // Só envia se confiança ALTA ou MEDIA
     if (confidenceLevel === 'BAIXA') {
       return { valid: false, reason: 'Confiança baixa' };
     }
+    
+    // Converte score interno (0-14) para porcentagem (0-100)
+    const scorePercentage = Math.round((confidence / 14) * 100);
     
     return {
       valid: true,
@@ -557,7 +592,8 @@ async function analyzeSymbol(symbol) {
       rr: rr.toFixed(2),
       confluences: confluences.join(' + '),
       confidenceLevel,
-      confidenceScore: confidence,
+      confidenceScore: scorePercentage,
+      score: scorePercentage,
       structure: structure.structure,
       choch: structure.choch,
       bos: structure.bos,
