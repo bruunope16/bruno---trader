@@ -1,38 +1,52 @@
-const express = require('express');
+   const express = require('express');
 const axios = require('axios');
 const TelegramBot = require('node-telegram-bot-api');
-const { RSI, MACD, EMA } = require('technicalindicators');
+const { RSI, MACD, EMA, ATR } = require('technicalindicators');
 const path = require('path');
 
-// ========== CONFIGURAÇÕES ==========
 const PORT = process.env.PORT || 3000;
 const TELEGRAM_TOKEN = '8604695024:AAEycHa9v4L2ZmOBxP20i9ZuBSmE1hNndxM';
 const CHAT_ID = '1763009688';
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: false });
 
-// ========== CONFIGURAÇÃO SCALP PROFISSIONAL ==========
 const CONFIG = {
   riskPerTrade: 0.02,
   leverage: 10,
   initialBalance: 1000,
   maxPositions: 3,
   
-  // Fibonacci Levels
-  fib: {
-    stopBelow: 0.786,
-    tp1: 1.272,
-    tp2: 1.414,
-    tp3: 1.618
+  scoreWeights: {
+    choch: 20, bos: 20, fibonacci: 10, orderBlock: 15, fvg: 15,
+    liquidity: 20, emaTrend: 20, macd: 10, rsi: 10, sr: 10,
+    volumeSpike: 15, trendAlignment: 20
   },
   
-  // Confluências mínimas
-  minConfluences: 4,  // Mínimo 4 confluências
+  minScore: 70,
+  highConfidence: 85,
+  atrMultiplier: 1.5,
+  volumeMultiplier: 1.2,
   
-  // Pares
   pairs: [
-    'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT',
-    'XRPUSDT', 'DOGEUSDT', 'AVAXUSDT', 'LINKUSDT', 'MATICUSDT'
+    'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
+    'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT',
+    'LINKUSDT', 'LTCUSDT', 'UNIUSDT', 'ATOMUSDT', 'XLMUSDT',
+    'NEARUSDT', 'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT',
+    'AAVEUSDT', 'MKRUSDT', 'COMPUSDT', 'SUSHIUSDT', 'CRVUSDT',
+    'YFIUSDT', '1INCHUSDT', 'SNXUSDT', 'UMAUSDT', 'BALUSDT',
+    'ARBUSDT', 'OPUSDT', 'APTUSDT', 'SUIUSDT', 'INJUSDT',
+    'FTMUSDT', 'HBARUSDT', 'EGLDUSDT', 'FLOWUSDT', 'ZENUSDT',
+    'SANDUSDT', 'MANAUSDT', 'AXSUSDT', 'GMTUSDT', 'APEUSDT',
+    'GALAUSDT', 'ENJUSDT', 'CHRUSDT', 'IMXUSDT', 'BLURUSDT',
+    'CAKEUSDT', 'BNXUSDT', 'MDTUSDT', 'SFPUSDT', 'TKOUSDT',
+    'SHIBUSDT', 'PEPEUSDT', 'FLOKIUSDT', 'BONKUSDT', 'WIFUSDT',
+    'FETUSDT', 'RENDERUSDT', 'OCEANUSDT', 'AGIXUSDT', 'GRTUSDT',
+    'XMRUSDT', 'ZECUSDT', 'DASHUSDT', 'SCRTUSDT',
+    'RUNEUSDT', 'KAVAUSDT', 'BANDUSDT', 'ANKRUSDT', 'STORJUSDT',
+    'IOTAUSDT', 'ZILUSDT', 'ONTUSDT', 'QTUMUSDT', 'BATUSDT',
+    'ETHBTC', 'BNBBTC', 'ADABTC', 'DOTBTC', 'LINKBTC',
+    'ARKMUSDT', 'TIAUSDT', 'PYTHUSDT', 'JUPUSDT', 'DYMUSDT',
+    'PORTALUSDT', 'PIXELUSDT', 'STRKUSDT', 'WUSDT', 'ACEUSDT'
   ]
 };
 
@@ -41,19 +55,12 @@ let state = {
   signals: [],
   trades: [],
   pendingTrades: [],
-  stats: {
-    totalTrades: 0,
-    wins: 0,
-    losses: 0,
-    totalProfit: 0,
-    winRate: 0
-  },
+  stats: { totalTrades: 0, wins: 0, losses: 0, totalProfit: 0, winRate: 0 },
   analysisCount: 0,
   logs: [],
   lastAnalysis: null
 };
 
-// ========== LOGS ==========
 function addLog(message, type = 'info') {
   const log = { timestamp: new Date().toISOString(), message, type };
   state.logs.unshift(log);
@@ -61,7 +68,6 @@ function addLog(message, type = 'info') {
   console.log(`[${type.toUpperCase()}] ${message}`);
 }
 
-// ========== TELEGRAM ==========
 async function sendTelegram(message) {
   try {
     await bot.sendMessage(CHAT_ID, message);
@@ -71,7 +77,6 @@ async function sendTelegram(message) {
   }
 }
 
-// ========== BINANCE API ==========
 async function getCandlesticks(symbol, interval = '15m', limit = 200) {
   try {
     const url = `https://api.binance.us/api/v3/klines`;
@@ -80,41 +85,40 @@ async function getCandlesticks(symbol, interval = '15m', limit = 200) {
       timeout: 10000
     });
     
-    if (!response.data || response.data.length === 0) {
-      throw new Error('Sem dados');
-    }
+    if (!response.data || response.data.length === 0) throw new Error('Sem dados');
     
     return response.data.map(c => ({
-      time: c[0],
-      open: parseFloat(c[1]),
-      high: parseFloat(c[2]),
-      low: parseFloat(c[3]),
-      close: parseFloat(c[4]),
-      volume: parseFloat(c[5])
+      time: c[0], open: parseFloat(c[1]), high: parseFloat(c[2]),
+      low: parseFloat(c[3]), close: parseFloat(c[4]), volume: parseFloat(c[5])
     }));
   } catch (error) {
-    addLog(`${symbol}: Erro API - ${error.message}`, 'warning');
     return null;
   }
 }
 
-// ========== ESTRUTURA DE MERCADO ==========
+function formatPrice(price) {
+  if (price >= 1000) return price.toFixed(2);
+  if (price >= 100) return price.toFixed(3);
+  if (price >= 10) return price.toFixed(4);
+  if (price >= 1) return price.toFixed(5);
+  if (price >= 0.1) return price.toFixed(6);
+  if (price >= 0.01) return price.toFixed(7);
+  return price.toFixed(8);
+}
+
 function detectMarketStructure(candles) {
   const len = candles.length;
   const swings = [];
   
-  // Detecta swing highs e lows
   for (let i = 5; i < len - 5; i++) {
     const current = candles[i];
     const before = candles.slice(i - 5, i);
     const after = candles.slice(i + 1, i + 6);
     
-    // Swing High
     if (before.every(c => c.high < current.high) && after.every(c => c.high < current.high)) {
       swings.push({ index: i, type: 'high', price: current.high });
     }
     
-    // Swing Low
     if (before.every(c => c.low > current.low) && after.every(c => c.low > current.low)) {
       swings.push({ index: i, type: 'low', price: current.low });
     }
@@ -122,114 +126,67 @@ function detectMarketStructure(candles) {
   
   if (swings.length < 4) return null;
   
-  // Últimos 4 swings
   const recent = swings.slice(-4);
-  
-  // Detecta padrão
-  let trend = null;
-  let structure = null;
-  let choch = false;
-  let bos = false;
+  let trend = null, structure = null, choch = false, bos = false;
   
   const highs = recent.filter(s => s.type === 'high').map(s => s.price);
   const lows = recent.filter(s => s.type === 'low').map(s => s.price);
   
-  // UPTREND: HH e HL
   if (highs.length >= 2 && lows.length >= 2) {
     if (highs[highs.length - 1] > highs[0] && lows[lows.length - 1] > lows[0]) {
       trend = 'bullish';
       structure = 'HH + HL';
     }
-    // DOWNTREND: LH e LL
     else if (highs[highs.length - 1] < highs[0] && lows[lows.length - 1] < lows[0]) {
       trend = 'bearish';
       structure = 'LH + LL';
     }
   }
   
-  // CHOCH: Mudança de caráter
   if (recent.length >= 3) {
     const last3 = recent.slice(-3);
     if (last3[0].type === 'high' && last3[1].type === 'low' && last3[2].type === 'high') {
-      if (last3[2].price < last3[0].price) {
-        choch = true;
-        trend = 'bearish';
-      }
+      if (last3[2].price < last3[0].price) { choch = true; trend = 'bearish'; }
     }
     if (last3[0].type === 'low' && last3[1].type === 'high' && last3[2].type === 'low') {
-      if (last3[2].price > last3[0].price) {
-        choch = true;
-        trend = 'bullish';
-      }
+      if (last3[2].price > last3[0].price) { choch = true; trend = 'bullish'; }
     }
   }
   
-  // BOS: Break of Structure
   const currentPrice = candles[len - 1].close;
-  if (trend === 'bullish' && highs.length >= 2 && currentPrice > Math.max(...highs)) {
-    bos = true;
-  }
-  if (trend === 'bearish' && lows.length >= 2 && currentPrice < Math.min(...lows)) {
-    bos = true;
-  }
+  if (trend === 'bullish' && highs.length >= 2 && currentPrice > Math.max(...highs)) bos = true;
+  if (trend === 'bearish' && lows.length >= 2 && currentPrice < Math.min(...lows)) bos = true;
   
-  return {
-    trend,
-    structure,
-    choch,
-    bos,
-    swings: recent,
-    lastHigh: Math.max(...highs),
-    lastLow: Math.min(...lows)
-  };
+  return { trend, structure, choch, bos, swings: recent, lastHigh: Math.max(...highs), lastLow: Math.min(...lows) };
 }
 
-// ========== FIBONACCI ==========
 function calculateFibonacci(candles, marketStructure) {
   if (!marketStructure || !marketStructure.trend) return null;
   
   const { trend, lastHigh, lastLow } = marketStructure;
   const diff = lastHigh - lastLow;
   
-  // Validação: diferença mínima de 1%
   if (diff / lastLow < 0.01) return null;
   
   let fib = {};
   
   if (trend === 'bullish') {
-    // Retração de um movimento de alta (mede de low para high)
     fib = {
-      level_0: lastHigh,
-      level_236: lastHigh - (diff * 0.236),
-      level_382: lastHigh - (diff * 0.382),
-      level_500: lastHigh - (diff * 0.500),
-      level_618: lastHigh - (diff * 0.618),
-      level_786: lastHigh - (diff * 0.786),
-      // Extensões para targets (acima do high)
-      ext_1272: lastHigh + (diff * 0.272),
-      ext_1414: lastHigh + (diff * 0.414),
-      ext_1618: lastHigh + (diff * 0.618)
+      level_0: lastHigh, level_236: lastHigh - (diff * 0.236), level_382: lastHigh - (diff * 0.382),
+      level_500: lastHigh - (diff * 0.500), level_618: lastHigh - (diff * 0.618), level_786: lastHigh - (diff * 0.786),
+      ext_1272: lastHigh + (diff * 0.272), ext_1414: lastHigh + (diff * 0.414), ext_1618: lastHigh + (diff * 0.618)
     };
   } else {
-    // Retração de um movimento de baixa (mede de high para low)
     fib = {
-      level_0: lastLow,
-      level_236: lastLow + (diff * 0.236),
-      level_382: lastLow + (diff * 0.382),
-      level_500: lastLow + (diff * 0.500),
-      level_618: lastLow + (diff * 0.618),
-      level_786: lastLow + (diff * 0.786),
-      // Extensões para targets (abaixo do low)
-      ext_1272: lastLow - (diff * 0.272),
-      ext_1414: lastLow - (diff * 0.414),
-      ext_1618: lastLow - (diff * 0.618)
+      level_0: lastLow, level_236: lastLow + (diff * 0.236), level_382: lastLow + (diff * 0.382),
+      level_500: lastLow + (diff * 0.500), level_618: lastLow + (diff * 0.618), level_786: lastLow + (diff * 0.786),
+      ext_1272: lastLow - (diff * 0.272), ext_1414: lastLow - (diff * 0.414), ext_1618: lastLow - (diff * 0.618)
     };
   }
   
   return fib;
 }
 
-// ========== ORDER BLOCK ==========
 function detectOrderBlock(candles) {
   const last10 = candles.slice(-10);
   let orderBlocks = [];
@@ -240,301 +197,210 @@ function detectOrderBlock(candles) {
     const body = Math.abs(current.close - current.open);
     const avgBody = last10.reduce((sum, c) => sum + Math.abs(c.close - c.open), 0) / 10;
     
-    // Bullish OB: vela bearish forte seguida de movimento bullish
     if (body > avgBody * 1.5 && current.close < current.open && next.close > next.open) {
-      orderBlocks.push({
-        type: 'bullish',
-        zone: [current.low, current.high],
-        strength: body / avgBody
-      });
+      orderBlocks.push({ type: 'bullish', zone: [current.low, current.high], strength: body / avgBody });
     }
     
-    // Bearish OB: vela bullish forte seguida de movimento bearish  
     if (body > avgBody * 1.5 && current.close > current.open && next.close < next.open) {
-      orderBlocks.push({
-        type: 'bearish',
-        zone: [current.low, current.high],
-        strength: body / avgBody
-      });
+      orderBlocks.push({ type: 'bearish', zone: [current.low, current.high], strength: body / avgBody });
     }
   }
   
   return orderBlocks.length > 0 ? orderBlocks[orderBlocks.length - 1] : null;
 }
 
-// ========== FAIR VALUE GAP ==========
 function detectFVG(candles) {
   const last5 = candles.slice(-5);
   
   for (let i = 0; i < last5.length - 2; i++) {
     const first = last5[i];
-    const middle = last5[i + 1];
     const third = last5[i + 2];
     
-    // Bullish FVG
-    if (third.low > first.high) {
-      return {
-        type: 'bullish',
-        gap: third.low - first.high,
-        zone: [first.high, third.low]
-      };
-    }
-    
-    // Bearish FVG
-    if (third.high < first.low) {
-      return {
-        type: 'bearish',
-        gap: first.low - third.high,
-        zone: [third.high, first.low]
-      };
-    }
+    if (third.low > first.high) return { type: 'bullish', gap: third.low - first.high, zone: [first.high, third.low] };
+    if (third.high < first.low) return { type: 'bearish', gap: first.low - third.high, zone: [third.high, first.low] };
   }
   
   return null;
 }
 
-// ========== LIQUIDITY ==========
 function detectLiquidity(candles, marketStructure) {
   if (!marketStructure) return null;
   
   const { swings } = marketStructure;
   const currentPrice = candles[candles.length - 1].close;
   
-  // Liquidez acima de swing highs
-  const aboveLiquidity = swings
-    .filter(s => s.type === 'high' && s.price > currentPrice)
-    .map(s => s.price);
-  
-  // Liquidez abaixo de swing lows
-  const belowLiquidity = swings
-    .filter(s => s.type === 'low' && s.price < currentPrice)
-    .map(s => s.price);
+  const aboveLiquidity = swings.filter(s => s.type === 'high' && s.price > currentPrice).map(s => s.price);
+  const belowLiquidity = swings.filter(s => s.type === 'low' && s.price < currentPrice).map(s => s.price);
   
   let captured = null;
-  
-  // Verifica se capturou liquidez recentemente
   const recent10 = candles.slice(-10);
   const recentHigh = Math.max(...recent10.map(c => c.high));
   const recentLow = Math.min(...recent10.map(c => c.low));
   
-  if (aboveLiquidity.some(liq => recentHigh >= liq)) {
-    captured = 'above';
-  }
-  if (belowLiquidity.some(liq => recentLow <= liq)) {
-    captured = 'below';
-  }
+  if (aboveLiquidity.some(liq => recentHigh >= liq)) captured = 'above';
+  if (belowLiquidity.some(liq => recentLow <= liq)) captured = 'below';
   
   return { above: aboveLiquidity, below: belowLiquidity, captured };
 }
 
-// ========== INDICADORES TÉCNICOS ==========
 function calculateIndicators(candles) {
   const closes = candles.map(c => c.close);
+  const highs = candles.map(c => c.high);
+  const lows = candles.map(c => c.low);
   
   const rsi = RSI.calculate({ values: closes, period: 14 });
-  const macd = MACD.calculate({
-    values: closes,
-    fastPeriod: 12,
-    slowPeriod: 26,
-    signalPeriod: 9
-  });
+  const macd = MACD.calculate({ values: closes, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 });
   const ema20 = EMA.calculate({ period: 20, values: closes });
   const ema50 = EMA.calculate({ period: 50, values: closes });
   const ema200 = EMA.calculate({ period: 200, values: closes });
+  const atr = ATR.calculate({ high: highs, low: lows, close: closes, period: 14 });
   
   return {
-    rsi: rsi[rsi.length - 1],
-    macd: macd[macd.length - 1],
-    ema20: ema20[ema20.length - 1],
-    ema50: ema50[ema50.length - 1],
-    ema200: ema200[ema200.length - 1],
-    price: closes[closes.length - 1]
+    rsi: rsi[rsi.length - 1], macd: macd[macd.length - 1],
+    ema20: ema20[ema20.length - 1], ema50: ema50[ema50.length - 1],
+    ema200: ema200[ema200.length - 1], atr: atr[atr.length - 1], price: closes[closes.length - 1]
   };
 }
 
-// ========== SUPPORT & RESISTANCE ==========
-function detectSR(candles) {
-  const highs = candles.map(c => c.high);
-  const lows = candles.map(c => c.low);
-  const currentPrice = candles[candles.length - 1].close;
+function analyzeVolume(candles) {
+  const volumes = candles.map(c => c.volume);
+  const avgVolume = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+  const currentVolume = volumes[volumes.length - 1];
   
-  // Encontra níveis que foram testados múltiplas vezes
+  const volumeSpike = currentVolume > avgVolume * CONFIG.volumeMultiplier;
+  const last3Vol = volumes.slice(-3);
+  const volumeIncreasing = last3Vol[2] > last3Vol[1] && last3Vol[1] > last3Vol[0];
+  
+  return { current: currentVolume, average: avgVolume, ratio: currentVolume / avgVolume, spike: volumeSpike, increasing: volumeIncreasing };
+}
+
+function detectSR(candles) {
+  const currentPrice = candles[candles.length - 1].close;
   const levels = [];
-  const tolerance = currentPrice * 0.002; // 0.2% tolerance
+  const tolerance = currentPrice * 0.002;
   
   for (let i = 0; i < candles.length - 20; i++) {
     const testPrice = candles[i].high;
-    const touches = candles.filter(c => 
-      Math.abs(c.high - testPrice) < tolerance || 
-      Math.abs(c.low - testPrice) < tolerance
-    ).length;
+    const touches = candles.filter(c => Math.abs(c.high - testPrice) < tolerance || Math.abs(c.low - testPrice) < tolerance).length;
     
-    if (touches >= 3) {
-      levels.push({ price: testPrice, touches, type: 'resistance' });
-    }
+    if (touches >= 3) levels.push({ price: testPrice, touches, type: 'resistance' });
   }
   
-  // Remove duplicados
-  const unique = levels.filter((level, index, self) =>
-    index === self.findIndex(l => Math.abs(l.price - level.price) < tolerance)
-  );
-  
-  // Encontra o mais próximo
-  const nearest = unique.sort((a, b) => 
-    Math.abs(a.price - currentPrice) - Math.abs(b.price - currentPrice)
-  )[0];
+  const unique = levels.filter((level, index, self) => index === self.findIndex(l => Math.abs(l.price - level.price) < tolerance));
+  const nearest = unique.sort((a, b) => Math.abs(a.price - currentPrice) - Math.abs(b.price - currentPrice))[0];
   
   return nearest || null;
 }
 
-// ========== ANÁLISE COMPLETA ==========
 async function analyzeSymbol(symbol) {
   try {
-    const candles = await getCandlesticks(symbol, '15m', 200);
-    if (!candles) return { valid: false, reason: 'Sem dados' };
+    const candles15m = await getCandlesticks(symbol, '15m', 200);
+    const candles1h = await getCandlesticks(symbol, '1h', 200);
+    const candles4h = await getCandlesticks(symbol, '4h', 100);
     
-    // Estrutura de mercado
-    const structure = detectMarketStructure(candles);
-    if (!structure || !structure.trend) {
-      return { valid: false, reason: 'Sem estrutura clara' };
-    }
+    if (!candles15m || !candles1h || !candles4h) return { valid: false, reason: 'Sem dados' };
     
-    // Fibonacci
-    const fib = calculateFibonacci(candles, structure);
+    const structure15m = detectMarketStructure(candles15m);
+    const structure1h = detectMarketStructure(candles1h);
+    const structure4h = detectMarketStructure(candles4h);
+    
+    if (!structure15m || !structure15m.trend) return { valid: false, reason: 'Sem estrutura 15m' };
+    
+    const ind15m = calculateIndicators(candles15m);
+    const ind1h = calculateIndicators(candles1h);
+    const ind4h = calculateIndicators(candles4h);
+    
+    const volume = analyzeVolume(candles15m);
+    const fib = calculateFibonacci(candles15m, structure15m);
     if (!fib) return { valid: false, reason: 'Fibonacci inválido' };
     
-    // Indicadores
-    const ind = calculateIndicators(candles);
+    const ob = detectOrderBlock(candles15m);
+    const fvg = detectFVG(candles15m);
+    const liq = detectLiquidity(candles15m, structure15m);
+    const sr = detectSR(candles15m);
     
-    // Order Block
-    const ob = detectOrderBlock(candles);
-    
-    // Fair Value Gap
-    const fvg = detectFVG(candles);
-    
-    // Liquidity
-    const liq = detectLiquidity(candles, structure);
-    
-    // Support/Resistance
-    const sr = detectSR(candles);
-    
-    // SISTEMA DE CONFLUÊNCIAS
     const confluences = [];
-    let confidence = 0;
+    let score = 0;
     
-    // 1. Estrutura (peso 2)
-    if (structure.choch) {
-      confluences.push(`CHOCH ${structure.trend}`);
-      confidence += 2;
-    }
-    if (structure.bos) {
-      confluences.push(`BOS ${structure.trend}`);
-      confidence += 2;
-    }
-    if (structure.structure) {
-      confluences.push(structure.structure);
-      confidence += 1;
-    }
+    if (structure15m.choch) { confluences.push(`CHOCH ${structure15m.trend}`); score += CONFIG.scoreWeights.choch; }
+    if (structure15m.bos) { confluences.push(`BOS ${structure15m.trend}`); score += CONFIG.scoreWeights.bos; }
     
-    // 2. Fibonacci (peso 2)
-    const price = ind.price;
+    const price = ind15m.price;
     const fibDistance618 = Math.abs(price - fib.level_618) / price;
     const fibDistance786 = Math.abs(price - fib.level_786) / price;
     
     if (fibDistance618 < 0.003 || fibDistance786 < 0.003) {
       confluences.push('Fibonacci 0.618/0.786');
-      confidence += 2;
+      score += CONFIG.scoreWeights.fibonacci;
     }
     
-    // 3. Order Block (peso 2)
-    if (ob && ob.type === structure.trend) {
-      confluences.push(`Order Block ${ob.type}`);
-      confidence += 2;
+    if (ob && ob.type === structure15m.trend) { confluences.push(`Order Block ${ob.type}`); score += CONFIG.scoreWeights.orderBlock; }
+    if (fvg && fvg.type === structure15m.trend) { confluences.push(`FVG ${fvg.type}`); score += CONFIG.scoreWeights.fvg; }
+    if (liq && liq.captured) { confluences.push(`Liquidez ${liq.captured}`); score += CONFIG.scoreWeights.liquidity; }
+    
+    const emaTrend15m = ind15m.price > ind15m.ema20 && ind15m.ema20 > ind15m.ema50;
+    const emaTrend1h = ind1h.price > ind1h.ema20 && ind1h.ema20 > ind1h.ema50;
+    
+    if (structure15m.trend === 'bullish' && emaTrend15m && emaTrend1h) {
+      confluences.push('EMA Uptrend Multi-TF');
+      score += CONFIG.scoreWeights.emaTrend;
+    }
+    if (structure15m.trend === 'bearish' && !emaTrend15m && !emaTrend1h) {
+      confluences.push('EMA Downtrend Multi-TF');
+      score += CONFIG.scoreWeights.emaTrend;
     }
     
-    // 4. Fair Value Gap (peso 1)
-    if (fvg && fvg.type === structure.trend) {
-      confluences.push(`FVG ${fvg.type}`);
-      confidence += 1;
-    }
-    
-    // 5. Liquidity (peso 2)
-    if (liq && liq.captured) {
-      confluences.push(`Liquidez capturada (${liq.captured})`);
-      confidence += 2;
-    }
-    
-    // 6. EMA Trend (peso 1)
-    if (structure.trend === 'bullish' && ind.price > ind.ema20 && ind.ema20 > ind.ema50) {
-      confluences.push('EMA Uptrend');
-      confidence += 1;
-    }
-    if (structure.trend === 'bearish' && ind.price < ind.ema20 && ind.ema20 < ind.ema50) {
-      confluences.push('EMA Downtrend');
-      confidence += 1;
-    }
-    
-    // 7. MACD (peso 1)
-    if (ind.macd && ind.macd.MACD > ind.macd.signal && structure.trend === 'bullish') {
+    if (ind15m.macd && ind15m.macd.MACD > ind15m.macd.signal && structure15m.trend === 'bullish') {
       confluences.push('MACD Bullish');
-      confidence += 1;
+      score += CONFIG.scoreWeights.macd;
     }
-    if (ind.macd && ind.macd.MACD < ind.macd.signal && structure.trend === 'bearish') {
+    if (ind15m.macd && ind15m.macd.MACD < ind15m.macd.signal && structure15m.trend === 'bearish') {
       confluences.push('MACD Bearish');
-      confidence += 1;
+      score += CONFIG.scoreWeights.macd;
     }
     
-    // 8. RSI (peso 1)
-    if (ind.rsi < 40 && structure.trend === 'bullish') {
-      confluences.push('RSI Oversold');
-      confidence += 1;
-    }
-    if (ind.rsi > 60 && structure.trend === 'bearish') {
-      confluences.push('RSI Overbought');
-      confidence += 1;
+    if (ind15m.rsi < 40 && structure15m.trend === 'bullish') { confluences.push('RSI Oversold'); score += CONFIG.scoreWeights.rsi; }
+    if (ind15m.rsi > 60 && structure15m.trend === 'bearish') { confluences.push('RSI Overbought'); score += CONFIG.scoreWeights.rsi; }
+    
+    if (sr) { confluences.push('S/R'); score += CONFIG.scoreWeights.sr; }
+    
+    if (volume.spike && volume.increasing) { confluences.push('Volume Spike'); score += CONFIG.scoreWeights.volumeSpike; }
+    
+    const trendAlignment = (structure15m.trend === structure1h.trend && structure1h.trend === structure4h.trend);
+    
+    if (trendAlignment) {
+      confluences.push(`Tendência ${structure15m.trend} alinhada 15m/1h/4h`);
+      score += CONFIG.scoreWeights.trendAlignment;
+    } else {
+      return { valid: false, reason: `Tendências desalinhadas (15m:${structure15m.trend} 1h:${structure1h.trend})` };
     }
     
-    // 9. Support/Resistance (peso 1)
-    if (sr) {
-      confluences.push(`S/R em ${sr.price.toFixed(2)}`);
-      confidence += 1;
-    }
+    if (score < CONFIG.minScore) return { valid: false, reason: `Score baixo: ${score}/${CONFIG.minScore}` };
     
-    // FILTRO: Mínimo 4 confluências
-    if (confluences.length < CONFIG.minConfluences) {
-      return { valid: false, reason: `Poucas confluências: ${confluences.length}/4` };
-    }
-    
-    // FILTRO: Score mínimo de 75
-    if (confidence < 7) {
-      return { valid: false, reason: `Score muito baixo: ${confidence} (mínimo 7)` };
-    }
-    
-    // ANTI-DUPLICAÇÃO
     const recentSignals = state.signals.slice(0, 20);
     const recentSame = recentSignals.find(s => s.symbol === symbol);
     if (recentSame) {
       const timeSince = Date.now() - new Date(recentSame.timestamp).getTime();
       const hoursSince = timeSince / (1000 * 60 * 60);
       
-      if (hoursSince < 6) {
-        return { valid: false, reason: `Sinal recente (${hoursSince.toFixed(1)}h)` };
-      }
+      if (hoursSince < 6) return { valid: false, reason: `Sinal recente (${hoursSince.toFixed(1)}h)` };
     }
     
-    // DEFINIR ENTRADA E TARGETS COM FIBONACCI
-    const direction = structure.trend === 'bullish' ? 'LONG' : 'SHORT';
+    const direction = structure15m.trend === 'bullish' ? 'LONG' : 'SHORT';
     const entry = price;
+    
+    const atrValue = ind15m.atr;
+    const atrStop = atrValue * CONFIG.atrMultiplier;
     
     let stop, tp1, tp2, tp3;
     
     if (direction === 'LONG') {
-      stop = fib.level_786 * 0.998; // Abaixo do 0.786
+      stop = entry - atrStop;
       tp1 = fib.ext_1272;
       tp2 = fib.ext_1414;
       tp3 = fib.ext_1618;
     } else {
-      stop = fib.level_786 * 1.002; // Acima do 0.786
+      stop = entry + atrStop;
       tp1 = fib.ext_1272;
       tp2 = fib.ext_1414;
       tp3 = fib.ext_1618;
@@ -542,132 +408,91 @@ async function analyzeSymbol(symbol) {
     
     const rr = Math.abs(tp3 - entry) / Math.abs(entry - stop);
     
-    // VALIDAÇÕES CRÍTICAS
-    // 1. Stop não pode ser igual ou muito próximo da entrada
-    if (Math.abs(entry - stop) / entry < 0.005) { // Menos de 0.5%
-      return { valid: false, reason: 'Stop muito próximo da entrada' };
-    }
+    if (Math.abs(entry - stop) / entry < 0.005) return { valid: false, reason: 'Stop muito próximo' };
+    if (rr < 1.5) return { valid: false, reason: `R:R baixo: ${rr.toFixed(2)}` };
+    if (direction === 'LONG' && tp3 <= entry) return { valid: false, reason: 'TP3 inválido LONG' };
+    if (direction === 'SHORT' && tp3 >= entry) return { valid: false, reason: 'TP3 inválido SHORT' };
     
-    // 2. TPs devem ser diferentes da entrada
-    if (Math.abs(tp1 - entry) / entry < 0.003 || Math.abs(tp2 - entry) / entry < 0.003) {
-      return { valid: false, reason: 'TPs muito próximos da entrada' };
-    }
-    
-    // 3. R:R mínimo de 1.5
-    if (rr < 1.5) {
-      return { valid: false, reason: `R:R muito baixo: ${rr.toFixed(2)}` };
-    }
-    
-    // 4. Verificar se TP3 está na direção correta
-    if (direction === 'LONG' && tp3 <= entry) {
-      return { valid: false, reason: 'TP3 abaixo da entrada em LONG' };
-    }
-    if (direction === 'SHORT' && tp3 >= entry) {
-      return { valid: false, reason: 'TP3 acima da entrada em SHORT' };
-    }
-    
-    // Nível de confiança
-    let confidenceLevel;
-    if (confidence >= 8) confidenceLevel = 'ALTA';
-    else if (confidence >= 7) confidenceLevel = 'MEDIA';
-    else confidenceLevel = 'BAIXA';
-    
-    // Só envia se confiança ALTA ou MEDIA
-    if (confidenceLevel === 'BAIXA') {
-      return { valid: false, reason: 'Confiança baixa' };
-    }
-    
-    // Converte score interno (0-14) para porcentagem (0-100)
-    const scorePercentage = Math.round((confidence / 14) * 100);
+    const confidenceLevel = score >= CONFIG.highConfidence ? 'ALTA' : 'MEDIA';
     
     return {
-      valid: true,
-      symbol,
-      direction,
-      entry: entry.toFixed(2),
-      stopLoss: stop.toFixed(2),
-      tp1: tp1.toFixed(2),
-      tp2: tp2.toFixed(2),
-      tp3: tp3.toFixed(2),
-      rr: rr.toFixed(2),
-      confluences: confluences.join(' + '),
-      confidenceLevel,
-      confidenceScore: scorePercentage,
-      score: scorePercentage,
-      structure: structure.structure,
-      choch: structure.choch,
-      bos: structure.bos,
+      valid: true, symbol, direction,
+      entry: formatPrice(entry), stopLoss: formatPrice(stop),
+      tp1: formatPrice(tp1), tp2: formatPrice(tp2), tp3: formatPrice(tp3),
+      rr: rr.toFixed(2), confluences: confluences.join(' + '),
+      confidenceLevel, score, structure: structure15m.structure,
+      choch: structure15m.choch, bos: structure15m.bos,
+      volumeRatio: volume.ratio.toFixed(2), atr: formatPrice(atrValue),
       timestamp: new Date().toISOString()
     };
     
   } catch (error) {
-    addLog(`Erro ${symbol}: ${error.message}`, 'error');
     return { valid: false, reason: error.message };
   }
 }
 
-// ========== ANÁLISE DO MERCADO ==========
 async function analyzeMarket() {
   try {
     state.analysisCount++;
-    addLog(`=== Analise Scalp #${state.analysisCount} ===`, 'info');
+    addLog(`=== Analise #${state.analysisCount} (${CONFIG.pairs.length} pares) ===`, 'info');
     
     const results = [];
     
     for (const symbol of CONFIG.pairs) {
-      addLog(`${symbol}...`, 'info');
       const result = await analyzeSymbol(symbol);
       
       if (result.valid) {
         results.push(result);
-        addLog(`${symbol}: SETUP! Confianca ${result.confidenceLevel}`, 'success');
+        addLog(`${symbol}: SETUP! Score ${result.score}`, 'success');
       } else {
         addLog(`${symbol}: ${result.reason}`, 'warning');
       }
       
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    results.sort((a, b) => b.confidenceScore - a.confidenceScore);
-    
-    const topSignals = results.slice(0, 1); // Apenas o melhor
+    results.sort((a, b) => b.score - a.score);
+    const topSignals = results.slice(0, 1);
     
     if (topSignals.length > 0) {
       const signal = topSignals[0];
       state.signals.unshift(signal);
       state.signals = state.signals.slice(0, 20);
       
-      const message = `🎯 SINAL SCALP PROFISSIONAL
+      const message = `🎯 SINAL PROFISSIONAL V4.0
 
 Par: ${signal.symbol}
 Direcao: ${signal.direction}
 
 Entrada: $${signal.entry}
-Stop Loss: $${signal.stopLoss}
+Stop Loss: $${signal.stopLoss} (ATR ${signal.atr})
 TP1: $${signal.tp1}
 TP2: $${signal.tp2}
 TP3: $${signal.tp3}
 
 R:R: 1:${signal.rr}
+Score: ${signal.score}/100
 Confianca: ${signal.confidenceLevel}
+
+Volume: ${signal.volumeRatio}x média
 
 Confluencias:
 ${signal.confluences}
 
-${signal.choch ? 'CHOCH detectado!' : ''}
-${signal.bos ? 'BOS confirmado!' : ''}
+${signal.choch ? '✅ CHOCH confirmado!' : ''}
+${signal.bos ? '✅ BOS confirmado!' : ''}
 
-Timeframe: 15min
-Estilo: Scalp Estruturado
+Timeframe: 15m (confirmado 1h + 4h)
+Estilo: Scalp Profissional
 
 ${new Date().toLocaleTimeString('pt-BR')}`;
       
       await sendTelegram(message);
       state.pendingTrades.push(signal);
       
-      addLog(`SINAL ENVIADO: ${signal.symbol} ${signal.direction} (${signal.confidenceLevel})`, 'success');
+      addLog(`SINAL: ${signal.symbol} ${signal.direction} (${signal.score}/100)`, 'success');
     } else {
-      addLog('Nenhum setup encontrado', 'info');
+      addLog('Nenhum setup de alta qualidade encontrado', 'info');
     }
     
     state.lastAnalysis = new Date();
@@ -677,7 +502,6 @@ ${new Date().toLocaleTimeString('pt-BR')}`;
   }
 }
 
-// ========== TRACKING ==========
 async function checkTradeResults() {
   if (state.pendingTrades.length === 0) return;
   
@@ -686,7 +510,7 @@ async function checkTradeResults() {
     const timeSince = Date.now() - new Date(trade.timestamp).getTime();
     const hoursSince = timeSince / (1000 * 60 * 60);
     
-    if (hoursSince < 2) continue; // Aguarda pelo menos 2h
+    if (hoursSince < 2) continue;
     
     const candles = await getCandlesticks(trade.symbol, '15m', 1);
     if (!candles) continue;
@@ -737,11 +561,11 @@ async function checkTradeResults() {
 
 Par: ${trade.symbol} ${trade.direction}
 Entrada: $${trade.entry}
-Saida: ${result.level} $${result.exit.toFixed(2)}
+Saida: ${result.level} $${formatPrice(result.exit)}
 Profit: ${result.profit > 0 ? '+' : ''}${result.profit.toFixed(2)}%
 
+Score: ${trade.score}/100
 Duracao: ${completed.duration}
-Confianca: ${trade.confidenceLevel}
 
 Banca: R$ ${state.balance.toFixed(2)}
 Win Rate: ${state.stats.winRate}%
@@ -754,26 +578,20 @@ ${new Date().toLocaleTimeString('pt-BR')}`;
   }
 }
 
-// ========== SERVIDOR EXPRESS ==========
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/status', (req, res) => {
   res.json({
-    status: 'online',
-    version: '3.0.0 - Scalp Pro',
-    uptime: process.uptime(),
-    analysisCount: state.analysisCount,
-    signalsCount: state.signals.length,
-    pendingTrades: state.pendingTrades.length,
-    lastAnalysis: state.lastAnalysis,
+    status: 'online', version: '4.0.0 - Professional', uptime: process.uptime(),
+    analysisCount: state.analysisCount, signalsCount: state.signals.length,
+    pendingTrades: state.pendingTrades.length, lastAnalysis: state.lastAnalysis,
     stats: state.stats,
     config: {
-      style: 'Scalp Estruturado',
-      timeframe: '15min',
-      confluences: CONFIG.minConfluences,
-      pairs: CONFIG.pairs.length
+      style: 'Scalp Profissional Multi-TF', timeframes: '15m + 1h + 4h',
+      minScore: CONFIG.minScore, pairs: CONFIG.pairs.length,
+      atrStop: 'ATR × ' + CONFIG.atrMultiplier
     }
   });
 });
@@ -788,48 +606,41 @@ app.get('/api/logs', (req, res) => {
 
 app.get('/health', (req, res) => res.send('OK'));
 
-// ========== INICIALIZAÇÃO ==========
 app.listen(PORT, async () => {
   addLog('========================================', 'success');
-  addLog('BRUNO TRADER SCALP PRO V3.0', 'success');
+  addLog('BRUNO TRADER PROFESSIONAL V4.0', 'success');
   addLog('========================================', 'success');
-  addLog(`Timeframe: 15min`, 'info');
-  addLog(`Estilo: Scalp Estruturado`, 'info');
-  addLog(`Confluencias minimas: ${CONFIG.minConfluences}`, 'info');
   addLog(`Pares: ${CONFIG.pairs.length}`, 'info');
+  addLog(`Timeframes: 15m + 1h + 4h`, 'info');
+  addLog(`Score minimo: ${CONFIG.minScore}/100`, 'info');
+  addLog(`Stop: ATR × ${CONFIG.atrMultiplier}`, 'info');
   
-  await sendTelegram(`🚀 BRUNO TRADER SCALP PRO V3.0
+  await sendTelegram(`🚀 BRUNO TRADER PRO V4.0
 
-Estilo: Scalp Estruturado
-Timeframe: 15 minutos
+SISTEMA PROFISSIONAL ATIVADO!
 
-Confluencias:
-- Estrutura (CHOCH/BOS)
-- Fibonacci 0.618/0.786
-- Order Block
-- Fair Value Gap
-- Liquidez
-- Support/Resistance
-- EMA Trend
-- MACD + RSI
+✅ 100 pares monitorados
+✅ Multi-timeframe (15m/1h/4h)
+✅ Score ponderado (min 70/100)
+✅ ATR stops dinâmicos
+✅ Filtro de volume
+✅ Fibonacci profissional
+✅ SMC completo
 
-Minimo 4 confluencias por sinal
-Fibonacci Stops (abaixo 0.786)
-TP1: 1.272 | TP2: 1.414 | TP3: 1.618
+Confluencias obrigatorias:
+- Tendencia alinhada 3 TFs
+- Volume > ${CONFIG.volumeMultiplier}x média
+- Score >= ${CONFIG.minScore}/100
+- R:R >= 1.5
 
-Sistema SMC Completo Ativado!
+Sistema institucional!
 
 ${new Date().toLocaleString('pt-BR')}`);
   
-  setTimeout(() => {
-    addLog('Primeira analise...', 'info');
-    analyzeMarket();
-  }, 10000);
+  setTimeout(() => { addLog('Primeira analise...', 'info'); analyzeMarket(); }, 10000);
   
-  setInterval(analyzeMarket, 900000); // 15min
-  setInterval(checkTradeResults, 1800000); // 30min
+  setInterval(analyzeMarket, 900000);
+  setInterval(checkTradeResults, 1800000);
 });
 
-process.on('unhandledRejection', (error) => {
-  addLog(`Erro: ${error.message}`, 'error');
-});
+process.on('unhandledRejection', (error) => { addLog(`Erro: ${error.message}`, 'error'); });
