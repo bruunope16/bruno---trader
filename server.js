@@ -1,4 +1,4 @@
-   const express = require('express');
+const express = require('express');
 const axios = require('axios');
 const TelegramBot = require('node-telegram-bot-api');
 const { RSI, MACD, EMA, ATR } = require('technicalindicators');
@@ -28,25 +28,28 @@ const CONFIG = {
   volumeMultiplier: 1.2,
   
   pairs: [
+    // TOP 20 - Market Cap
     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
     'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT',
     'LINKUSDT', 'LTCUSDT', 'UNIUSDT', 'ATOMUSDT', 'XLMUSDT',
-    'NEARUSDT', 'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT',
+    'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT', 'NEARUSDT',
+    
+    // DEFI & Layer 1 (15)
     'AAVEUSDT', 'MKRUSDT', 'COMPUSDT', 'SUSHIUSDT', 'CRVUSDT',
     'YFIUSDT', '1INCHUSDT', 'SNXUSDT', 'UMAUSDT', 'BALUSDT',
-    'ARBUSDT', 'OPUSDT', 'APTUSDT', 'SUIUSDT', 'INJUSDT',
     'FTMUSDT', 'HBARUSDT', 'EGLDUSDT', 'FLOWUSDT', 'ZENUSDT',
-    'SANDUSDT', 'MANAUSDT', 'AXSUSDT', 'GMTUSDT', 'APEUSDT',
-    'GALAUSDT', 'ENJUSDT', 'CHRUSDT', 'IMXUSDT', 'BLURUSDT',
-    'CAKEUSDT', 'BNXUSDT', 'MDTUSDT', 'SFPUSDT', 'TKOUSDT',
-    'SHIBUSDT', 'PEPEUSDT', 'FLOKIUSDT', 'BONKUSDT', 'WIFUSDT',
-    'FETUSDT', 'RENDERUSDT', 'OCEANUSDT', 'AGIXUSDT', 'GRTUSDT',
-    'XMRUSDT', 'ZECUSDT', 'DASHUSDT', 'SCRTUSDT',
-    'RUNEUSDT', 'KAVAUSDT', 'BANDUSDT', 'ANKRUSDT', 'STORJUSDT',
-    'IOTAUSDT', 'ZILUSDT', 'ONTUSDT', 'QTUMUSDT', 'BATUSDT',
-    'ETHBTC', 'BNBBTC', 'ADABTC', 'DOTBTC', 'LINKBTC',
-    'ARKMUSDT', 'TIAUSDT', 'PYTHUSDT', 'JUPUSDT', 'DYMUSDT',
-    'PORTALUSDT', 'PIXELUSDT', 'STRKUSDT', 'WUSDT', 'ACEUSDT'
+    
+    // Gaming/Metaverse (10)
+    'SANDUSDT', 'MANAUSDT', 'AXSUSDT', 'ENJUSDT', 'CHRUSDT',
+    'GALAUSDT', 'GMTUSDT', 'APEUSDT', 'IMXUSDT', 'BLURUSDT',
+    
+    // Memecoins (2 - verificados)
+    'SHIBUSDT', 'PEPEUSDT',
+    
+    // Outros (13)
+    'CAKEUSDT', 'BNXUSDT', 'RUNEUSDT', 'KAVAUSDT', 'BANDUSDT',
+    'ANKRUSDT', 'STORJUSDT', 'IOTAUSDT', 'ZILUSDT', 'ONTUSDT',
+    'QTUMUSDT', 'BATUSDT', 'FLOKIUSDT'
   ]
 };
 
@@ -619,7 +622,7 @@ app.listen(PORT, async () => {
 
 SISTEMA PROFISSIONAL ATIVADO!
 
-✅ 100 pares monitorados
+✅ 60 pares verificados Binance.US
 ✅ Multi-timeframe (15m/1h/4h)
 ✅ Score ponderado (min 70/100)
 ✅ ATR stops dinâmicos
