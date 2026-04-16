@@ -28,28 +28,25 @@ const CONFIG = {
   volumeMultiplier: 1.2,
   
   pairs: [
-    // TOP 20 - Market Cap
     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
     'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT',
     'LINKUSDT', 'LTCUSDT', 'UNIUSDT', 'ATOMUSDT', 'XLMUSDT',
-    'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT', 'NEARUSDT',
-    
-    // DEFI & Layer 1 (15)
+    'NEARUSDT', 'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT',
     'AAVEUSDT', 'MKRUSDT', 'COMPUSDT', 'SUSHIUSDT', 'CRVUSDT',
     'YFIUSDT', '1INCHUSDT', 'SNXUSDT', 'UMAUSDT', 'BALUSDT',
+    'ARBUSDT', 'OPUSDT', 'APTUSDT', 'SUIUSDT', 'INJUSDT',
     'FTMUSDT', 'HBARUSDT', 'EGLDUSDT', 'FLOWUSDT', 'ZENUSDT',
-    
-    // Gaming/Metaverse (10)
-    'SANDUSDT', 'MANAUSDT', 'AXSUSDT', 'ENJUSDT', 'CHRUSDT',
-    'GALAUSDT', 'GMTUSDT', 'APEUSDT', 'IMXUSDT', 'BLURUSDT',
-    
-    // Memecoins (2 - verificados)
-    'SHIBUSDT', 'PEPEUSDT',
-    
-    // Outros (13)
-    'CAKEUSDT', 'BNXUSDT', 'RUNEUSDT', 'KAVAUSDT', 'BANDUSDT',
-    'ANKRUSDT', 'STORJUSDT', 'IOTAUSDT', 'ZILUSDT', 'ONTUSDT',
-    'QTUMUSDT', 'BATUSDT', 'FLOKIUSDT'
+    'SANDUSDT', 'MANAUSDT', 'AXSUSDT', 'GMTUSDT', 'APEUSDT',
+    'GALAUSDT', 'ENJUSDT', 'CHRUSDT', 'IMXUSDT', 'BLURUSDT',
+    'CAKEUSDT', 'BNXUSDT', 'MDTUSDT', 'SFPUSDT', 'TKOUSDT',
+    'SHIBUSDT', 'PEPEUSDT', 'FLOKIUSDT', 'BONKUSDT', 'WIFUSDT',
+    'FETUSDT', 'RENDERUSDT', 'OCEANUSDT', 'AGIXUSDT', 'GRTUSDT',
+    'XMRUSDT', 'ZECUSDT', 'DASHUSDT', 'SCRTUSDT',
+    'RUNEUSDT', 'KAVAUSDT', 'BANDUSDT', 'ANKRUSDT', 'STORJUSDT',
+    'IOTAUSDT', 'ZILUSDT', 'ONTUSDT', 'QTUMUSDT', 'BATUSDT',
+    'ETHBTC', 'BNBBTC', 'ADABTC', 'DOTBTC', 'LINKBTC',
+    'ARKMUSDT', 'TIAUSDT', 'PYTHUSDT', 'JUPUSDT', 'DYMUSDT',
+    'PORTALUSDT', 'PIXELUSDT', 'STRKUSDT', 'WUSDT', 'ACEUSDT'
   ]
 };
 
@@ -462,98 +459,33 @@ async function analyzeMarket() {
       state.signals.unshift(signal);
       state.signals = state.signals.slice(0, 20);
       
-      // Calcula zona de entrada (±0.3%)
-      const entryPrice = parseFloat(signal.entry);
-      const zoneMin = formatPrice(entryPrice * 0.997);
-      const zoneMax = formatPrice(entryPrice * 1.003);
-      
-      // Calcula percentuais
-      const stopPrice = parseFloat(signal.stopLoss);
-      const tp1Price = parseFloat(signal.tp1);
-      const tp2Price = parseFloat(signal.tp2);
-      const tp3Price = parseFloat(signal.tp3);
-      
-      const riskPercent = (((stopPrice - entryPrice) / entryPrice) * 100).toFixed(2);
-      const tp1Percent = (((tp1Price - entryPrice) / entryPrice) * 100).toFixed(1);
-      const tp2Percent = (((tp2Price - entryPrice) / entryPrice) * 100).toFixed(1);
-      const tp3Percent = (((tp3Price - entryPrice) / entryPrice) * 100).toFixed(1);
-      
-      // Barra de força visual
-      const scorePercent = Math.round((signal.score / 100) * 10);
-      const greenBars = '🟩'.repeat(scorePercent);
-      const grayBars = '⬜'.repeat(10 - scorePercent);
-      
-      // Análise de tendência
-      const trendText = signal.direction === 'LONG' ? 'Alta' : 'Baixa';
-      const volumeText = signal.volumeRatio >= 2 ? 'Forte' : signal.volumeRatio >= 1.5 ? 'Médio' : 'Fraco';
-      const forceText = signal.score >= 85 ? 'Forte' : signal.score >= 70 ? 'Média' : 'Fraca';
-      
-      const message = `🚨 FUTURES SIGNAL | ${signal.symbol}
+      const message = `🎯 SINAL PROFISSIONAL V4.0
 
-📈 Direção: ${signal.direction}
-⚡ Alavancagem: ${CONFIG.leverage}x
-🎯 Score: ${signal.score}/100
+Par: ${signal.symbol}
+Direcao: ${signal.direction}
 
-━━━━━━━━━━━━━━━━━━
+Entrada: $${signal.entry}
+Stop Loss: $${signal.stopLoss} (ATR ${signal.atr})
+TP1: $${signal.tp1}
+TP2: $${signal.tp2}
+TP3: $${signal.tp3}
 
-📡 Exchange: Binance Futures
-⏱ Timeframe: 15m
-📊 Tipo: Scalping Estruturado
-⏳ Duração Estimada: 2h — 6h
+R:R: 1:${signal.rr}
+Score: ${signal.score}/100
+Confianca: ${signal.confidenceLevel}
 
-━━━━━━━━━━━━━━━━━━
+Volume: ${signal.volumeRatio}x média
 
-💰 Entrada: ${signal.entry}
-📍 Zona de Entrada: ${zoneMin} — ${zoneMax}
-
-🛑 Stop Loss: ${signal.stopLoss}
-⚠️ Risco: ${riskPercent}%
-
-━━━━━━━━━━━━━━━━━━
-
-🎯 Take Profits
-
-🥇 TP1: ${signal.tp1} (${tp1Percent > 0 ? '+' : ''}${tp1Percent}%)
-🥈 TP2: ${signal.tp2} (${tp2Percent > 0 ? '+' : ''}${tp2Percent}%)
-🥉 TP3: ${signal.tp3} (${tp3Percent > 0 ? '+' : ''}${tp3Percent}%)
-
-━━━━━━━━━━━━━━━━━━
-
-📊 Risk / Reward
-📉 Risco: ${riskPercent}%
-📈 Retorno Máx: ${tp3Percent > 0 ? '+' : ''}${tp3Percent}%
-⚖️ RR: 1:${signal.rr}
-
-━━━━━━━━━━━━━━━━━━
-
-📊 Dados do Trade
-
-📊 Tendência: ${trendText}
-📈 Volume: ${volumeText}
-⚡ Força: ${forceText}
-🔥 Volatilidade: Média/Alta
-
-━━━━━━━━━━━━━━━━━━
-
-📊 Força do Sinal
-${greenBars}${grayBars} ${signal.score}%
-
-━━━━━━━━━━━━━━━━━━
-
-✅ Confluências Detectadas:
+Confluencias:
 ${signal.confluences}
 
-━━━━━━━━━━━━━━━━━━
+${signal.choch ? '✅ CHOCH confirmado!' : ''}
+${signal.bos ? '✅ BOS confirmado!' : ''}
 
-📅 Data: ${new Date().toLocaleDateString('pt-BR')}
-🕐 Horário: ${new Date().toLocaleTimeString('pt-BR')} (UTC-3)
+Timeframe: 15m (confirmado 1h + 4h)
+Estilo: Scalp Profissional
 
-━━━━━━━━━━━━━━━━━━
-
-🤖 Bruno Trader Pro V4.0
-🚀 Análise Multi-Timeframe
-📊 Smart Money Concepts
-📡 Binance Futures`;
+${new Date().toLocaleTimeString('pt-BR')}`;
       
       await sendTelegram(message);
       state.pendingTrades.push(signal);
@@ -625,42 +557,20 @@ async function checkTradeResults() {
       state.pendingTrades.splice(i, 1);
       
       const emoji = result.outcome === 'WIN' ? '🟢' : '🔴';
-      const outcomeText = result.outcome === 'WIN' ? 'GREEN ✅' : 'RED ❌';
-      const profitSign = result.profit > 0 ? '+' : '';
-      
-      const msg = `${emoji} RESULTADO ${outcomeText}
+      const msg = `${emoji} ${result.outcome}!
 
-━━━━━━━━━━━━━━━━━━
+Par: ${trade.symbol} ${trade.direction}
+Entrada: $${trade.entry}
+Saida: ${result.level} $${formatPrice(result.exit)}
+Profit: ${result.profit > 0 ? '+' : ''}${result.profit.toFixed(2)}%
 
-📊 Trade: ${trade.symbol} ${trade.direction}
-💰 Entrada: $${trade.entry}
-🎯 Saída: ${result.level} $${formatPrice(result.exit)}
+Score: ${trade.score}/100
+Duracao: ${completed.duration}
 
-━━━━━━━━━━━━━━━━━━
+Banca: R$ ${state.balance.toFixed(2)}
+Win Rate: ${state.stats.winRate}%
 
-💵 Resultado:
-${result.outcome === 'WIN' ? '✅' : '❌'} Profit: ${profitSign}${result.profit.toFixed(2)}%
-⏱ Duração: ${completed.duration}
-📊 Score Original: ${trade.score}/100
-
-━━━━━━━━━━━━━━━━━━
-
-📈 Estatísticas Atualizadas:
-
-💰 Banca: R$ ${state.balance.toFixed(2)}
-📊 Total Trades: ${state.stats.totalTrades}
-✅ Wins: ${state.stats.wins}
-❌ Losses: ${state.stats.losses}
-📈 Win Rate: ${state.stats.winRate}%
-
-━━━━━━━━━━━━━━━━━━
-
-📅 ${new Date().toLocaleDateString('pt-BR')}
-🕐 ${new Date().toLocaleTimeString('pt-BR')}
-
-━━━━━━━━━━━━━━━━━━
-
-🤖 Bruno Trader Pro V4.0`;
+${new Date().toLocaleTimeString('pt-BR')}`;
       
       await sendTelegram(msg);
       addLog(`${emoji} ${trade.symbol}: ${result.outcome}`, result.outcome === 'WIN' ? 'success' : 'error');
@@ -709,7 +619,7 @@ app.listen(PORT, async () => {
 
 SISTEMA PROFISSIONAL ATIVADO!
 
-✅ 60 pares verificados Binance.US
+✅ 100 pares monitorados
 ✅ Multi-timeframe (15m/1h/4h)
 ✅ Score ponderado (min 70/100)
 ✅ ATR stops dinâmicos
