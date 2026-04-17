@@ -1,530 +1,161 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
+<!DOCTYPE html><html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Bruno Trader Pro V4</title>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<style>
-
-:root {
---bg-primary:#0a0e27;
---bg-secondary:#111827;
---card-bg:#1a1f3a;
---accent:#fbbf24;
---green:#10b981;
---red:#ef4444;
---blue:#3b82f6;
---text:#fff;
---text-muted:#94a3b8;
-}
+<title>Robô IA Dashboard</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"><style>
 
 *{
 margin:0;
 padding:0;
 box-sizing:border-box;
+font-family: 'Inter', sans-serif;
 }
 
 body{
-font-family:Inter,Segoe UI,sans-serif;
-background:linear-gradient(135deg,var(--bg-primary),var(--bg-secondary));
-color:white;
+background: linear-gradient(145deg,#2e2e2e,#1f1f1f);
+color:#e6e6e6;
 min-height:100vh;
-}
-
-/* HEADER */
-
-.header{
 padding:20px;
-background:rgba(0,0,0,.4);
-backdrop-filter:blur(10px);
-border-bottom:1px solid rgba(255,255,255,.1);
 }
 
-.header-title{
-font-size:22px;
-font-weight:700;
-color:var(--accent);
-}
-
-.container{
+.dashboard{
 max-width:1400px;
 margin:auto;
-padding:20px;
 }
 
-/* STATS */
-
-.stats-grid{
-display:grid;
-grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-gap:15px;
-margin-bottom:20px;
-}
-
-.stat-card{
-background:var(--card-bg);
-padding:15px;
-border-radius:12px;
-}
-
-.stat-title{
-font-size:12px;
-color:var(--text-muted);
-}
-
-.stat-value{
-font-size:26px;
-font-weight:700;
-margin-top:5px;
-}
-
-/* TODAY */
-
-.today{
-background:var(--card-bg);
-padding:20px;
-border-radius:12px;
-margin-bottom:20px;
-}
-
-.today-grid{
-display:grid;
-grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-gap:15px;
-margin-top:10px;
-}
-
-.today-item{
-text-align:center;
-}
-
-.today-value{
-font-size:20px;
-font-weight:700;
-}
-
-/* SIGNALS */
-
-.signals{
-background:var(--card-bg);
-padding:20px;
-border-radius:12px;
-}
-
-.signal{
-background:#111827;
-padding:15px;
-border-radius:10px;
-margin-bottom:12px;
-}
-
-.signal-header{
+.header{
 display:flex;
 justify-content:space-between;
+align-items:center;
+margin-bottom:25px;
+}
+
+.title{
+font-size:26px;
+font-weight:600;
+}
+
+.status{
+padding:8px 18px;
+border-radius:20px;
+background:linear-gradient(145deg,#3a4a5a,#2a3644);
+box-shadow: 5px 5px 10px #1a1a1a,
+-5px -5px 10px #383838;
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+gap:20px;
+}
+
+.card{
+background:rgba(255,255,255,0.05);
+border-radius:20px;
+padding:20px;
+backdrop-filter: blur(20px);
+box-shadow:
+8px 8px 20px rgba(0,0,0,0.6),
+-4px -4px 12px rgba(255,255,255,0.05);
+transition:0.3s;
+}
+
+.card:hover{
+transform:translateY(-6px);
+}
+
+.card-title{
+font-size:14px;
+opacity:0.7;
 margin-bottom:10px;
 }
 
-.signal-pair{
-font-size:18px;
-font-weight:700;
+.card-value{
+font-size:28px;
+font-weight:600;
+}
+
+.signal-card{
+grid-column: span 2;
 }
 
 .signal-long{
-color:var(--green);
+color:#4fd1c5;
 }
 
 .signal-short{
-color:var(--red);
+color:#f87171;
 }
 
-.signal-meta{
-display:flex;
-gap:10px;
-font-size:12px;
-color:var(--text-muted);
-margin-bottom:10px;
+.progress{
+margin-top:10px;
+height:10px;
+border-radius:20px;
+background:rgba(255,255,255,0.1);
+overflow:hidden;
 }
 
-.signal-grid{
-display:grid;
-grid-template-columns:repeat(3,1fr);
-gap:10px;
+.progress-bar{
+height:100%;
+background:linear-gradient(90deg,#4a90e2,#7f5af0);
+width:85%;
 }
 
-.signal-box{
-background:#0a0e27;
-padding:8px;
-border-radius:6px;
-text-align:center;
+.last-signals{
+max-height:300px;
+overflow-y:auto;
 }
 
-.scroll{
-max-height:600px;
-overflow:auto;
-}
-
-.logs{
-margin-top:20px;
-background:var(--card-bg);
-padding:20px;
+.signal-item{
+padding:12px;
 border-radius:12px;
+margin-bottom:10px;
+background:rgba(255,255,255,0.04);
 }
 
-.log{
-font-size:12px;
-margin-bottom:6px;
-color:var(--text-muted);
+.footer{
+margin-top:20px;
+text-align:center;
+opacity:0.6;
 }
 
-</style>
-
-</head>
-
-<body>
-
-<div class="header">
-<div class="header-title">
-🚀 Bruno Trader Pro V4
+</style></head><body><div class="dashboard"><div class="header">
+<div class="title">🤖 Robô IA Profissional</div>
+<div class="status">🟢 Online</div>
+</div><div class="grid"><div class="card signal-card">
+<div class="card-title">Sinal Atual</div>
+<div class="card-value signal-long">BTCUSDT LONG</div>
+<div class="progress">
+<div class="progress-bar"></div>
 </div>
-</div>
-
-<div class="container">
-
-<div class="stats-grid">
-
-<div class="stat-card">
-<div class="stat-title">Análises</div>
-<div class="stat-value" id="analysis">0</div>
-</div>
-
-<div class="stat-card">
-<div class="stat-title">Sinais</div>
-<div class="stat-value" id="signals">0</div>
-</div>
-
-<div class="stat-card">
-<div class="stat-title">Win Rate</div>
-<div class="stat-value" id="winrate">0%</div>
-</div>
-
-<div class="stat-card">
-<div class="stat-title">Profit</div>
-<div class="stat-value" id="profit">0</div>
-</div>
-
-</div>
-
-<div class="today">
-
-<h3>📊 Estatísticas Hoje</h3>
-
-<div class="today-grid">
-
-<div class="today-item">
-<div>Sinais</div>
-<div class="today-value" id="todaySignals">0</div>
-</div>
-
-<div class="today-item">
-<div>Ativos</div>
-<div class="today-value" id="todayActive">0</div>
-</div>
-
-<div class="today-item">
-<div>Wins</div>
-<div class="today-value" id="todayWins">0</div>
-</div>
-
-<div class="today-item">
-<div>Loss</div>
-<div class="today-value" id="todayLoss">0</div>
-</div>
-
-<div class="today-item">
-<div>WinRate</div>
-<div class="today-value" id="todayWR">0%</div>
-</div>
-
-<div class="today-item">
-<div>Lucro</div>
-<div class="today-value" id="todayProfit">0</div>
-</div>
-
-<div class="today-item">
-<div>Melhor</div>
-<div class="today-value" id="bestTrade">0%</div>
-</div>
-
-<div class="today-item">
-<div>Pior</div>
-<div class="today-value" id="worstTrade">0%</div>
-</div>
-
-</div>
-
-</div>
-
-<div class="signals">
-
-<h3>🚀 Últimos Sinais</h3>
-
-<div class="scroll" id="signalsBox">
-
-Carregando...
-
-</div>
-
-</div>
-
-<div class="logs">
-
-<h3>🧠 Logs</h3>
-
-<div id="logs"></div>
-
-</div>
-
-    </div>
-    <script>
-
-async function update(){
-
-try{
-
-const status=await fetch("/api/status").then(r=>r.json())
-const signals=await fetch("/api/signals").then(r=>r.json())
-const logs=await fetch("/api/logs").then(r=>r.json())
-
-/* STATS */
-
-document.getElementById("analysis").innerText=status.analysisCount||0
-document.getElementById("signals").innerText=status.signalsCount||0
-document.getElementById("winrate").innerText=(status.stats?.winRate||0)+"%"
-document.getElementById("profit").innerText=status.stats?.totalProfit||0
-
-/* TODAY */
-
-document.getElementById("todaySignals").innerText=status.signalsCount||0
-document.getElementById("todayActive").innerText=status.pendingTrades||0
-document.getElementById("todayWins").innerText=status.stats?.wins||0
-document.getElementById("todayLoss").innerText=status.stats?.losses||0
-document.getElementById("todayWR").innerText=(status.stats?.winRate||0)+"%"
-document.getElementById("todayProfit").innerText=status.stats?.totalProfit||0
-
-document.getElementById("bestTrade").innerText="+2.1%"
-document.getElementById("worstTrade").innerText="-1.3%"
-
-/* SIGNALS */
-
-if(signals.signals){
-
-let html=""
-
-signals.signals.slice(0,10).forEach(s=>{
-
-const date=new Date(s.timestamp)
-
-const d=date.toLocaleDateString("pt-BR")
-const t=date.toLocaleTimeString("pt-BR",{hour:'2-digit',minute:'2-digit'})
-
-html+=`
-
-<div class="signal">
-
-<div class="signal-header">
-
-<div class="signal-pair">
-
-${s.symbol}
-
-<span class="signal-${s.direction.toLowerCase()}">
-${s.direction}
-</span>
-
-</div>
-
-<div>
-
-Score ${s.score||0}
-
-</div>
-
-</div>
-
-<div class="signal-meta">
-
-<div>📅 ${d}</div>
-<div>🕐 ${t}</div>
-<div>📊 Volume Alto</div>
-
-</div>
-
-<div class="signal-grid">
-
-<div class="signal-box">
-Entrada
-<br>
-$${s.entry}
-</div>
-
-<div class="signal-box">
-Stop
-<br>
-$${s.stopLoss}
-</div>
-
-<div class="signal-box">
-TP1
-<br>
-$${s.tp1}
-</div>
-
-<div class="signal-box">
-TP2
-<br>
-$${s.tp2}
-</div>
-
-<div class="signal-box">
-TP3
-<br>
-$${s.tp3}
-</div>
-
-<div class="signal-box">
-RR
-<br>
-${s.rr}
-</div>
-
-</div>
-
-</div>
-
-`
-
-})
-
-document.getElementById("signalsBox").innerHTML=html
-
-}
-
-/* LOGS */
-
-if(logs.logs){
-
-let l=""
-
-logs.logs.slice(0,20).forEach(log=>{
-
-const t=new Date(log.timestamp).toLocaleTimeString("pt-BR")
-
-l+=`<div class="log">[${t}] ${log.message}</div>`
-
-})
-
-document.getElementById("logs").innerHTML=l
-
-}
-
-}catch(e){
-console.log(e)
-}
-
-}
-
-setInterval(update,8000)
-
-update()
-
-    </script>
-    <script>
-
-/* ANIMAÇÃO SUAVE */
-
-document.addEventListener("DOMContentLoaded",()=>{
-
-document.body.style.opacity="0"
-
-setTimeout(()=>{
-document.body.style.transition="0.4s"
-document.body.style.opacity="1"
-},100)
-
-})
-
-/* AUTO SCROLL LOGS */
-
-function autoScroll(){
-
-const logs=document.getElementById("logs")
-
-logs.scrollTop=logs.scrollHeight
-
-}
-
-setInterval(autoScroll,5000)
-
-/* DETECTAR NOVO SINAL */
-
-let lastSignal=""
-
-async function checkNew(){
-
-try{
-
-const res=await fetch("/api/signals")
-const data=await res.json()
-
-if(!data.signals) return
-
-const current=data.signals[0]?.symbol+data.signals[0]?.timestamp
-
-if(lastSignal!=="" && lastSignal!==current){
-
-notify("Novo sinal detectado 🚀")
-
-}
-
-lastSignal=current
-
-}catch{}
-
-}
-
-setInterval(checkNew,5000)
-
-/* NOTIFICAÇÃO */
-
-function notify(text){
-
-const div=document.createElement("div")
-
-div.style.position="fixed"
-div.style.bottom="20px"
-div.style.right="20px"
-div.style.background="#10b981"
-div.style.padding="12px 20px"
-div.style.borderRadius="8px"
-div.style.fontWeight="600"
-div.style.zIndex="999"
-
-div.innerText=text
-
-document.body.appendChild(div)
-
-setTimeout(()=>{
-div.remove()
-},4000)
-
-}
-
-</script>
-
-</body>
-
+</div><div class="card">
+<div class="card-title">Score IA</div>
+<div class="card-value">96/100</div>
+</div><div class="card">
+<div class="card-title">Confiança</div>
+<div class="card-value">94%</div>
+</div><div class="card">
+<div class="card-title">Win Rate</div>
+<div class="card-value">82%</div>
+</div><div class="card">
+<div class="card-title">Lucro Hoje</div>
+<div class="card-value">+5.4%</div>
+</div><div class="card">
+<div class="card-title">Volume</div>
+<div class="card-value">Alto</div>
+</div><div class="card">
+<div class="card-title">Volatilidade</div>
+<div class="card-value">Alta</div>
+</div><div class="card">
+<div class="card-title">Últimos Sinais</div>
+<div class="last-signals"><div class="signal-item">ETH LONG +1.2%</div>
+<div class="signal-item">SOL LONG +0.8%</div>
+<div class="signal-item">BTC SHORT -0.4%</div>
+<div class="signal-item">ATOM LONG +1.5%</div>
+<div class="signal-item">BNB LONG +0.6%</div>
+<div class="signal-item">ADA SHORT -0.2%</div>
+<div class="signal-item">DOGE LONG +0.9%</div></div>
+</div></div><div class="footer">
+Robô IA Profissional v4.0
+</div></div></body>
 </html>
