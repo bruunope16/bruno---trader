@@ -1,4 +1,4 @@
- const express = require('express');
+const express = require('express');
 const axios = require('axios');
 const TelegramBot = require('node-telegram-bot-api');
 const { RSI, MACD, EMA, ATR } = require('technicalindicators');
