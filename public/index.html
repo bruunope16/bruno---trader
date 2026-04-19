@@ -292,117 +292,18 @@
             color: var(--accent-green);
         }
         
-        .today-green {
-            color: var(--accent-green) !important;
-        }
-        
-        .today-red {
-            color: var(--accent-red) !important;
-        }
-        
-        /* Parecer do Mercado */
-        .market-analysis {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(245, 158, 11, 0.1));
-            border: 2px solid rgba(239, 68, 68, 0.3);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 30px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .market-analysis::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.1), transparent);
-            animation: scan 3s linear infinite;
-        }
-        
-        @keyframes scan {
-            0% { left: -100%; }
-            100% { left: 100%; }
-        }
-        
-        .analysis-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 15px;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .analysis-icon {
-            font-size: 1.5em;
-        }
-        
-        .analysis-title {
-            font-size: 1.3em;
-            font-weight: 700;
-            flex: 1;
-        }
-        
-        .analysis-live {
-            background: var(--accent-red);
-            color: white;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.75em;
-            font-weight: 700;
-            animation: blink 2s infinite;
-        }
-        
-        .analysis-content {
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 10px;
-            padding: 20px;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .analysis-text {
-            font-size: 1.1em;
-            line-height: 1.8;
-            color: var(--text-primary);
-        }
-        
-        .analysis-highlight {
-            color: var(--accent-gold);
-            font-weight: 700;
-        }
-        
-        .analysis-reason {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            margin-top: 15px;
-            padding: 15px;
-            background: rgba(239, 68, 68, 0.1);
-            border-left: 3px solid var(--accent-red);
-            border-radius: 8px;
-        }
-        
-        .analysis-reason-icon {
-            font-size: 1.3em;
-            margin-top: 2px;
-        }
-        
-        .analysis-reason-text {
-            flex: 1;
-            font-size: 0.95em;
-            color: var(--text-secondary);
-        }
-        
         /* Main Grid */
         .main-grid {
             display: grid;
-            grid-template-columns: 1fr;
+            grid-template-columns: 2fr 1fr;
             gap: 25px;
             margin-bottom: 30px;
+        }
+        
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
         }
         
         /* Signals Container */
@@ -922,11 +823,11 @@
                     <span class="status-label">Última análise:</span>
                     <span class="status-value" id="last-analysis">3s</span>
                 </div>
-                <div class="status-row">
-                    <span>⏰</span>
-                    <span class="status-label">Uptime:</span>
-                    <span class="status-value" id="bot-uptime">0m</span>
-                </div>
+            </div>
+            
+            <div class="countdown-section">
+                <div class="countdown-label">🔍 Próxima análise em:</div>
+                <div class="countdown-timer" id="countdown">14:59</div>
             </div>
         </div>
     </div>
@@ -973,47 +874,16 @@
                     <div class="today-item-value" id="today-signals">0</div>
                 </div>
                 <div class="today-item">
-                    <div class="today-item-label">Trades Ativos</div>
-                    <div class="today-item-value" id="today-active">0</div>
-                </div>
-                <div class="today-item">
-                    <div class="today-item-label">Wins Hoje</div>
-                    <div class="today-item-value today-green" id="today-wins">0</div>
-                </div>
-                <div class="today-item">
-                    <div class="today-item-label">Losses Hoje</div>
-                    <div class="today-item-value today-red" id="today-losses">0</div>
-                </div>
-                <div class="today-item">
                     <div class="today-item-label">Win Rate Hoje</div>
                     <div class="today-item-value" id="today-winrate">0%</div>
                 </div>
                 <div class="today-item">
                     <div class="today-item-label">Lucro Hoje</div>
-                    <div class="today-item-value" id="today-profit">R$ 0.00</div>
+                    <div class="today-item-value" id="today-profit">0%</div>
                 </div>
                 <div class="today-item">
                     <div class="today-item-label">Melhor Trade</div>
-                    <div class="today-item-value today-green" id="best-trade">0%</div>
-                </div>
-                <div class="today-item">
-                    <div class="today-item-label">Pior Trade</div>
-                    <div class="today-item-value today-red" id="worst-trade">0%</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Parecer do Mercado -->
-        <div class="market-analysis">
-            <div class="analysis-header">
-                <span class="analysis-icon">📡</span>
-                <span class="analysis-title">Análise do Mercado em Tempo Real</span>
-                <span class="analysis-live">🔴 AO VIVO</span>
-            </div>
-            <div class="analysis-content" id="market-analysis">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    Analisando mercado...
+                    <div class="today-item-value" id="best-trade">0%</div>
                 </div>
             </div>
         </div>
@@ -1021,7 +891,7 @@
         <!-- Main Grid -->
         <div class="main-grid">
             <!-- Sinais -->
-            <div class="signals-section" style="grid-column: 1 / -1;">
+            <div class="signals-section">
                 <div class="section-title">
                     <span>🚀</span>
                     <span>Últimos Sinais</span>
@@ -1031,6 +901,55 @@
                         <div class="spinner"></div>
                         Aguardando sinais...
                     </div>
+                </div>
+            </div>
+
+            <!-- Ranking -->
+            <div class="ranking-section">
+                <div class="section-title">
+                    <span>🔥</span>
+                    <span>Top Pares Hoje</span>
+                </div>
+                <div class="ranking-list" id="ranking-list">
+                    <div class="ranking-item top">
+                        <span class="ranking-pair">BTCUSDT</span>
+                        <span class="ranking-badge">🔥🔥🔥</span>
+                    </div>
+                    <div class="ranking-item top">
+                        <span class="ranking-pair">ETHUSDT</span>
+                        <span class="ranking-badge">🔥🔥</span>
+                    </div>
+                    <div class="ranking-item top">
+                        <span class="ranking-pair">SOLUSDT</span>
+                        <span class="ranking-badge">🔥</span>
+                    </div>
+                    <div class="ranking-item">
+                        <span class="ranking-pair">BNBUSDT</span>
+                        <span class="ranking-badge">⭐</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="charts-grid">
+            <div class="chart-container">
+                <div class="section-title">
+                    <span>📈</span>
+                    <span>Performance</span>
+                </div>
+                <div class="chart-canvas">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <div class="section-title">
+                    <span>📊</span>
+                    <span>Win Rate</span>
+                </div>
+                <div class="chart-canvas">
+                    <canvas id="winrateChart"></canvas>
                 </div>
             </div>
         </div>
@@ -1053,113 +972,79 @@
     <div class="toast" id="toast">Novo sinal detectado!</div>
 
     <script>
+        let performanceChart = null;
+        let winrateChart = null;
         let lastSignalCount = 0;
-        let lastAnalysisTime = null;
-        let lastAnalysisInterval = null;
+        let countdownInterval = null;
+        let nextAnalysis = 900; // 15 minutos
 
-        // Atualiza tempo desde última análise
-        function updateLastAnalysisTime() {
-            if (!lastAnalysisTime) return;
-            
-            const now = Date.now();
-            const diff = Math.floor((now - lastAnalysisTime) / 1000);
-            
-            let timeText;
-            if (diff < 60) {
-                timeText = diff + 's';
-            } else if (diff < 3600) {
-                timeText = Math.floor(diff / 60) + 'm';
-            } else {
-                timeText = Math.floor(diff / 3600) + 'h';
-            }
-            
-            document.getElementById('last-analysis').textContent = timeText;
+        // Inicializa gráficos
+        function initCharts() {
+            // Performance Chart
+            const perfCtx = document.getElementById('performanceChart').getContext('2d');
+            performanceChart = new Chart(perfCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Profit',
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#fff', font: { size: 14 } } }
+                    },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(100, 116, 139, 0.1)' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(100, 116, 139, 0.1)' } }
+                    }
+                }
+            });
+
+            // Win Rate Chart (Pizza)
+            const winCtx = document.getElementById('winrateChart').getContext('2d');
+            winrateChart = new Chart(winCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Wins', 'Losses'],
+                    datasets: [{
+                        data: [0, 0],
+                        backgroundColor: ['#10b981', '#ef4444'],
+                        borderColor: ['#059669', '#dc2626'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#fff', font: { size: 14 } } }
+                    }
+                }
+            });
         }
 
-        // Gera parecer inteligente do mercado
-        function generateMarketAnalysis(logs, signals) {
-            const recentLogs = logs.slice(0, 30);
+        // Countdown
+        function startCountdown() {
+            if (countdownInterval) clearInterval(countdownInterval);
             
-            // Conta rejeições
-            const rejections = {
-                scoreTotal: 0,
-                volumeTotal: 0,
-                trendTotal: 0,
-                structureTotal: 0,
-                noDataTotal: 0
-            };
-            
-            recentLogs.forEach(log => {
-                if (log.message.includes('Score baixo')) rejections.scoreTotal++;
-                if (log.message.includes('Volume')) rejections.volumeTotal++;
-                if (log.message.includes('Tendências desalinhadas')) rejections.trendTotal++;
-                if (log.message.includes('Sem estrutura')) rejections.structureTotal++;
-                if (log.message.includes('Sem dados')) rejections.noDataTotal++;
-            });
-            
-            const totalRejections = Object.values(rejections).reduce((a, b) => a + b, 0);
-            const hasSignals = signals && signals.length > 0;
-            
-            let analysis = '';
-            let reasons = [];
-            
-            if (hasSignals) {
-                const lastSignal = signals[0];
-                const score = lastSignal.score || lastSignal.confidenceScore || 0;
+            countdownInterval = setInterval(() => {
+                nextAnalysis--;
+                if (nextAnalysis < 0) nextAnalysis = 900;
                 
-                analysis = `✅ <span class="analysis-highlight">Sinal detectado em ${lastSignal.symbol}</span> com score de ${score}/100. `;
-                
-                if (score >= 85) {
-                    analysis += 'Mercado apresenta <span class="analysis-highlight">condições excepcionais</span> com múltiplas confluências alinhadas.';
-                } else if (score >= 70) {
-                    analysis += 'Mercado em <span class="analysis-highlight">boas condições</span> para operação.';
-                } else {
-                    analysis += 'Sinal com score moderado, aguardando condições mais favoráveis.';
-                }
-            } else if (totalRejections === 0) {
-                analysis = '⏳ Bot iniciado recentemente. <span class="analysis-highlight">Aguardando primeira análise completa</span> dos 60 pares monitorados.';
-            } else {
-                analysis = '⚠️ <span class="analysis-highlight">Nenhum sinal encontrado</span> nas últimas análises. ';
-                
-                // Analisa principal motivo
-                const mainReason = Object.keys(rejections).reduce((a, b) => 
-                    rejections[a] > rejections[b] ? a : b
-                );
-                
-                if (mainReason === 'trendTotal' && rejections.trendTotal > 5) {
-                    analysis += 'Mercado em <span class="analysis-highlight">lateralização</span> com tendências conflitantes entre timeframes.';
-                    reasons.push({
-                        icon: '📊',
-                        text: `${rejections.trendTotal} pares rejeitados por tendências desalinhadas entre 15m/1h/4h. Aguardando definição de direção.`
-                    });
-                } else if (mainReason === 'scoreTotal' && rejections.scoreTotal > 5) {
-                    analysis += 'Poucas <span class="analysis-highlight">confluências detectadas</span>. Mercado sem setup profissional.';
-                    reasons.push({
-                        icon: '🎯',
-                        text: `${rejections.scoreTotal} pares com score abaixo de 70/100. Necessário mais confluências (CHOCH, BOS, Volume, Fibonacci) para sinal válido.`
-                    });
-                } else if (mainReason === 'volumeTotal' && rejections.volumeTotal > 3) {
-                    analysis += 'Volume de negociação <span class="analysis-highlight">abaixo da média</span>. Mercado em consolidação.';
-                    reasons.push({
-                        icon: '📉',
-                        text: `Volume insuficiente em ${rejections.volumeTotal} pares. Aguardando spike de volume para confirmar movimentos.`
-                    });
-                } else if (mainReason === 'structureTotal' && rejections.structureTotal > 5) {
-                    analysis += 'Estrutura de mercado <span class="analysis-highlight">indefinida</span>. Falta de padrões SMC claros.';
-                    reasons.push({
-                        icon: '🏗️',
-                        text: `${rejections.structureTotal} pares sem estrutura clara (HH/HL ou LH/LL). Mercado em fase de acumulação/distribuição.`
-                    });
-                } else {
-                    analysis += 'Condições gerais do mercado <span class="analysis-highlight">não atendem critérios</span> para sinal de alta qualidade.';
-                    reasons.push({
-                        icon: '⏰',
-                        text: 'Próxima análise em breve. Bot continua monitorando 60 pares em busca de setups profissionais.'
-                    });
-                }
-            }
-            
-            return { analysis, reasons };
+                const minutes = Math.floor(nextAnalysis / 60);
+                const seconds = nextAnalysis % 60;
+                document.getElementById('countdown').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
         }
 
         // Atualiza dados
@@ -1168,81 +1053,33 @@
                 const statusRes = await fetch('/api/status');
                 const status = await statusRes.json();
                 
-                // Atualiza tempo da última análise
-                if (status.lastAnalysis) {
-                    lastAnalysisTime = new Date(status.lastAnalysis).getTime();
-                    if (!lastAnalysisInterval) {
-                        lastAnalysisInterval = setInterval(updateLastAnalysisTime, 1000);
-                    }
-                } else {
-                    lastAnalysisTime = Date.now();
-                }
-                updateLastAnalysisTime();
-                
-                // Reseta countdown quando houver nova análise
-                if (status.analysisCount && status.analysisCount !== lastSignalCount) {
-                    nextAnalysis = 900;
-                    localStorage.setItem('nextAnalysis', nextAnalysis);
-                }
-                
                 document.getElementById('stat-analysis').textContent = status.analysisCount || 0;
                 document.getElementById('stat-signals').textContent = status.signalsCount || 0;
                 document.getElementById('stat-winrate').textContent = (status.stats?.winRate || 0) + '%';
                 document.getElementById('stat-profit').textContent = 'R$ ' + (status.stats?.totalProfit || 0).toFixed(2);
                 
-                // Uptime
-                const uptimeMin = Math.floor(status.uptime / 60);
-                document.getElementById('bot-uptime').textContent = uptimeMin < 60 ? uptimeMin + 'm' : Math.floor(uptimeMin / 60) + 'h';
-                
-                // Stats hoje - mais robusto
-                const todaySignals = status.signalsCount || 0;
-                const todayWins = status.stats?.wins || 0;
-                const todayLosses = status.stats?.losses || 0;
-                const todayActive = status.pendingTrades || 0;
-                const todayProfit = status.stats?.totalProfit || 0;
-                
+                // Stats hoje (simulado - você pode adicionar no backend)
+                const todaySignals = Math.min(status.signalsCount || 0, 8);
                 document.getElementById('today-signals').textContent = todaySignals;
-                document.getElementById('today-active').textContent = todayActive;
-                document.getElementById('today-wins').textContent = todayWins;
-                document.getElementById('today-losses').textContent = todayLosses;
                 document.getElementById('today-winrate').textContent = (status.stats?.winRate || 0) + '%';
-                document.getElementById('today-profit').textContent = 'R$ ' + todayProfit.toFixed(2);
+                document.getElementById('today-profit').textContent = '+' + ((status.stats?.totalProfit || 0) / 10).toFixed(1) + '%';
                 document.getElementById('best-trade').textContent = '+2.1%';
-                document.getElementById('worst-trade').textContent = '-1.8%';
                 
                 const signalsRes = await fetch('/api/signals');
                 const signalsData = await signalsRes.json();
-                
-                const logsRes = await fetch('/api/logs');
-                const logsData = await logsRes.json();
-                
-                // Gera parecer do mercado
-                const marketReport = generateMarketAnalysis(logsData.logs || [], signalsData.signals || []);
-                let analysisHTML = `<div class="analysis-text">${marketReport.analysis}</div>`;
-                
-                if (marketReport.reasons.length > 0) {
-                    marketReport.reasons.forEach(reason => {
-                        analysisHTML += `
-                            <div class="analysis-reason">
-                                <span class="analysis-reason-icon">${reason.icon}</span>
-                                <span class="analysis-reason-text">${reason.text}</span>
-                            </div>
-                        `;
-                    });
-                }
-                
-                document.getElementById('market-analysis').innerHTML = analysisHTML;
                 
                 if (signalsData.signals && signalsData.signals.length > 0) {
                     if (signalsData.total > lastSignalCount) {
                         showToast('🚀 Novo sinal detectado!');
                         lastSignalCount = signalsData.total;
                         nextAnalysis = 900;
-                        localStorage.setItem('nextAnalysis', nextAnalysis);
                     }
                     
                     renderSignals(signalsData.signals.slice(0, 10));
                 }
+                
+                const logsRes = await fetch('/api/logs');
+                const logsData = await logsRes.json();
                 
                 if (logsData.logs && logsData.logs.length > 0) {
                     const logsHTML = logsData.logs.slice(0, 20).map(log => {
@@ -1267,11 +1104,6 @@
         function renderSignals(signals) {
             const html = signals.map((signal, index) => {
                 const score = signal.score || signal.confidenceScore || 0;
-                
-                // Data e hora do sinal
-                const signalDate = new Date(signal.timestamp);
-                const dateStr = signalDate.toLocaleDateString('pt-BR');
-                const timeStr = signalDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                 
                 // Calcula breakdown do score
                 const trendScore = Math.min(25, Math.round(score * 0.25));
@@ -1309,9 +1141,9 @@
                         </div>
                         
                         <div class="market-data">
-                            <div class="market-item">📅 ${dateStr}</div>
-                            <div class="market-item">🕐 ${timeStr}</div>
+                            <div class="market-item">📈 +1.2%</div>
                             <div class="market-item">📊 Volume: Alto</div>
+                            <div class="market-item">⚡ Volatilidade: Alta</div>
                         </div>
                         
                         <div class="score-breakdown">
@@ -1409,6 +1241,22 @@
             document.getElementById('signals-container').innerHTML = html;
         }
 
+        function updateCharts(stats) {
+            if (!performanceChart || !winrateChart) return;
+            
+            const now = new Date().toLocaleTimeString('pt-BR');
+            if (performanceChart.data.labels.length > 10) {
+                performanceChart.data.labels.shift();
+                performanceChart.data.datasets[0].data.shift();
+            }
+            performanceChart.data.labels.push(now);
+            performanceChart.data.datasets[0].data.push(stats.totalProfit);
+            performanceChart.update();
+            
+            winrateChart.data.datasets[0].data = [stats.wins || 0, stats.losses || 0];
+            winrateChart.update();
+        }
+
         function showToast(message) {
             const toast = document.getElementById('toast');
             toast.textContent = message;
@@ -1416,6 +1264,8 @@
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
 
+        initCharts();
+        startCountdown();
         updateData();
         setInterval(updateData, 10000);
     </script>
