@@ -188,10 +188,9 @@ async function getCandlesticks(simbolo, intervalo = '15m', limite = 200) {
     addLog(`${simbolo}: erro ao buscar candles (${erro.message})`, 'error');
     return null;
   }
-} {
-  }
+}
 
-functn formatPrice(price) {
+function formatPrice(price) {
   if (price >= 1000) return price.toFixed(2);
   if (price >= 100) return price.toFixed(3);
   if (price >= 10) return price.toFixed(4);
