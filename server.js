@@ -1109,7 +1109,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/status', (req, res) => {
   res.json({
-    status: 'online', version: ''4.2.0 - Bruno Trader Pro'', uptime: process.uptime(),
+  status: 'online',
+  version: '4.2.0 - Bruno Trader Pro',
+  uptime: process.uptime(),
     analysisCount: state.analysisCount, signalsCount: state.signals.length,
     pendingTrades: state.pendingTrades.length, lastAnalysis: state.lastAnalysis,
     stats: state.stats,
