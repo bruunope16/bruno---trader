@@ -62,7 +62,7 @@ const CONFIG = {
   pairs: [
     // TOP COINS - 100% Verificados Binance.US
     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
-    'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT',
+    'ADAUSDT', 'AVAXUSDT', 'APEUSDT'SDT', 'MATICUSDT',
     'LINKUSDT', 'LTCUSDT', 'UNIUSDT', 'ATOMUSDT', 'XLMUSDT',
     'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT', 'NEARUSDT',
     
@@ -189,25 +189,9 @@ async function getCandlesticks(simbolo, intervalo = '15m', limite = 200) {
     return null;
   }
 } {
-  try {
-    const url = `https://api.binance.us/api/v3/klines`;
-    const response = await axios.get(url, {
-      params: { symbol, interval, limit },
-      timeout: 10000
-    });
-    
-    if (!response.data || response.data.length === 0) throw new Error('Sem dados');
-    
-    return response.data.map(c => ({
-      time: c[0], open: parseFloat(c[1]), high: parseFloat(c[2]),
-      low: parseFloat(c[3]), close: parseFloat(c[4]), volume: parseFloat(c[5])
-    }));
-  } catch (error) {
-    return null;
   }
-}
 
-function formatPrice(price) {
+functn formatPrice(price) {
   if (price >= 1000) return price.toFixed(2);
   if (price >= 100) return price.toFixed(3);
   if (price >= 10) return price.toFixed(4);
