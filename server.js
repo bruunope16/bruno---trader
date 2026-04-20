@@ -462,10 +462,6 @@ function analyzeVolume(candles) {
   const volumes = candles.map(c => c.volume);
   
   // Volume médio 24h (96 velas de 15min = 24h)
-function analyzeVolume(candles) {
-  const volumes = candles.map(c => c.volume);
-  
-  // Volume médio 24h (96 velas de 15min = 24h)
   const last96 = volumes.slice(-Math.min(96, volumes.length));
   const avgVolume24h = last96.reduce((a, b) => a + b, 0) / last96.length;
   
