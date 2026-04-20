@@ -34,11 +34,10 @@ const CONFIG = {
     highcap: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'],
     layer1: ['SOLUSDT', 'AVAXUSDT', 'NEARUSDT', 'DOTUSDT'],
     defi: ['AAVEUSDT', 'UNIUSDT', 'COMPUSDT', 'SUSHIUSDT', 'CRVUSDT'],
-    gaming: ['SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'CHRUSDT', 'GALAUSDT', 'GMTUSDT', 'APEUSDT'],
+    gaming: ['SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'GALAUSDT'' 'APEUSDT'],
     meme: ['SHIBUSDT', 'PEPEUSDT', 'DOGEUSDT'],
     others: ['ADAUSDT', 'XRPUSDT', 'MATICUSDT', 'LINKUSDT', 'LTCUSDT', 'ATOMUSDT', 
-             'XLMUSDT', 'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT', 'CAKEUSDT', 
-             'BNXUSDT', 'IOTAUSDT']
+             'XLMUSDT', 'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT', 'CAKEUSDT', 'IOTAUSDT']
   },
   
   scoreWeights: {
@@ -70,14 +69,13 @@ const CONFIG = {
     'AAVEUSDT', 'COMPUSDT', 'SUSHIUSDT', 'CRVUSDT',
     
     // GAMING/METAVERSE - Verificados
-    'SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'CHRUSDT', 'GALAUSDT',
-    'GMTUSDT', 'APEUSDT',
+    'SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'APEUSDT',
     
     // MEME COINS - Verificados
     'SHIBUSDT', 'PEPEUSDT',
     
     // OUTROS - Verificados
-    'CAKEUSDT', 'BNXUSDT', 'IOTAUSDT'
+    'CAKEUSDT','IOTAUSDT'
   ]
 };
 
