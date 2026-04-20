@@ -730,7 +730,7 @@ async function analyzeMarket() {
         addLog(`${symbol}: ${result.reason}`, 'warning');
       }
       
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
     
     results.sort((a, b) => b.score - a.score);
@@ -854,7 +854,7 @@ ${signal.confluences}
       state.pendingTrades.push(signal);
       
       addLog(`SINAL: ${signal.symbol} ${signal.direction} (${signal.score}/100)`, 'success');
-    } else {
+   } else {
       addLog('Nenhum setup de alta qualidade encontrado', 'info');
     }
     
