@@ -67,25 +67,19 @@ const CONFIG = {
   },
   
   pairs: [
-    // TOP COINS - 100% Verificados Binance.US
-    'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
-    'ADAUSDT', 'AVAXUSDT', 'MATICUSDT',
-    'LINKUSDT', 'LTCUSDT', 'UNIUSDT', 'ATOMUSDT', 'XLMUSDT',
-    'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT', 'NEARUSDT',
-    
-    // DEFI - Verificados
-    'AAVEUSDT', 'COMPUSDT', 'SUSHIUSDT', 'CRVUSDT',
-    
-    // GAMING/METAVERSE - Verificados
-    'SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'APEUSDT',
-    
-    // MEME COINS - Verificados
-    'SHIBUSDT', 'PEPEUSDT',
-    
-    // OUTROS - Verificados
-    'CAKEUSDT','IOTAUSDT'
-  ]
-};
+  'BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT',
+  'ADAUSDT','AVAXUSDT','MATICUSDT',
+  'LINKUSDT','LTCUSDT','UNIUSDT','ATOMUSDT','XLMUSDT',
+  'ALGOUSDT','VETUSDT','ICPUSDT','FILUSDT','NEARUSDT',
+
+  'AAVEUSDT','COMPUSDT','CRVUSDT',
+
+  'SANDUSDT','MANAUSDT','ENJUSDT',
+
+  'SHIBUSDT',
+
+  'CAKEUSDT'
+]
 
 let state = {
   balance: CONFIG.initialBalance,
