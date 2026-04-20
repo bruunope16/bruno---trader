@@ -344,9 +344,15 @@ function detectMarketStructure(candles) {
   if (trend === 'bullish' && highs.length >= 2 && currentPrice > Math.max(...highs)) bos = true;
   if (trend === 'bearish' && lows.length >= 2 && currentPrice < Math.min(...lows)) bos = true;
   
-  return { trend, structure, choch, bos, swings: recent, lastHigh: Math.max(...highs), lastLow: Math.min(...lows) };
-}
-
+  return { 
+  trend, 
+  structure, 
+  choch, 
+  bos, 
+  swings: recent, 
+  lastHigh: highs.length ? Math.max(...highs) : null, 
+  lastLow: lows.length ? Math.min(...lows) : null 
+};
 function calculateFibonacci(candles, marketStructure) {
   if (!marketStructure || !marketStructure.trend) return null;
   
