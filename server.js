@@ -119,73 +119,71 @@ async function sendTelegram(message) {
   }
 }
 
-async function getCandlesticks(simbolo, intervalo = '15m', limite = 200) {
+async function getCandlesticks(symbol, interval = '15m', limit = 200) {
   try {
     const url = `https://api.binance.us/api/v3/klines`;
     
-    const resposta = await axios.get(url, {
+    const response = await axios.get(url, {
       params: { 
-        symbol: simbolo, 
-        interval: intervalo, 
-        limit: limite 
+        symbol: symbol, 
+        interval: interval, 
+        limit: limit 
       },
       timeout: 10000
     });
 
-    if (!resposta.data || resposta.data.length === 0) {
-      throw new Error('Sem dados');
+    if (!response.data || response.data.length === 0) {
+      throw new Error('No data');
     }
 
-    const candles = resposta.data.map((c, indice) => {
-      const abertura = parseFloat(c[1]);
-      const maxima = parseFloat(c[2]);
-      const minima = parseFloat(c[3]);
-      const fechamento = parseFloat(c[4]);
+    const candles = response.data.map((c, index) => {
+      const open = parseFloat(c[1]);
+      const high = parseFloat(c[2]);
+      const low = parseFloat(c[3]);
+      const close = parseFloat(c[4]);
       const volume = parseFloat(c[5]);
 
-      const corpo = Math.abs(fechamento - abertura);
-      const pavioSuperior = maxima - Math.max(abertura, fechamento);
-      const pavioInferior = Math.min(abertura, fechamento) - minima;
-      const range = maxima - minima;
+      const body = Math.abs(close - open);
+      const upperWick = high - Math.max(open, close);
+      const lowerWick = Math.min(open, close) - low;
+      const range = high - low;
 
       return {
-        tempo: c[0] / 1000,
-        abertura,
-        maxima,
-        minima,
-        fechamento,
+        time: c[0] / 1000,
+        open,
+        high,
+        low,
+        close,
         volume,
 
-        // Estrutura do candle
-        corpo,
+        // Candle structure
+        body,
         range,
-        pavioSuperior,
-        pavioInferior,
+        upperWick,
+        lowerWick,
 
-        // Direção
-        direcao: fechamento > abertura ? 1 : -1,
-        alta: fechamento > abertura,
-        baixa: fechamento < abertura,
+        // Direction
+        direction: close > open ? 1 : -1,
+        bullish: close > open,
+        bearish: close < open,
 
-        // Ponto médio liquidez
-        meio: (maxima + minima) / 2,
+        // Liquidity midpoint
+        midpoint: (high + low) / 2,
 
-        // Índice
-        indice
+        index
       };
     });
 
-    // Volume médio
-    const volumeMedio =
-      candles.reduce((soma, c) => soma + c.volume, 0) / candles.length;
+    const volumeAverage =
+      candles.reduce((sum, c) => sum + c.volume, 0) / candles.length;
 
     return candles.map(c => ({
       ...c,
-      volumeMedio
+      volumeAverage
     }));
 
-  } catch (erro) {
-    addLog(`${simbolo}: erro ao buscar candles (${erro.message})`, 'error');
+  } catch (error) {
+    addLog(`${symbol}: candle error (${error.message})`, 'error');
     return null;
   }
 }
