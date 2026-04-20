@@ -62,7 +62,7 @@ const CONFIG = {
   pairs: [
     // TOP COINS - 100% Verificados Binance.US
     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
-    'ADAUSDT', 'AVAXUSDT', 'APEUSDT', 'MATICUSDT',
+    'ADAUSDT', 'AVAXUSDT', 'MATICUSDT',
     'LINKUSDT', 'LTCUSDT', 'UNIUSDT', 'ATOMUSDT', 'XLMUSDT',
     'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT', 'NEARUSDT',
     
@@ -1109,7 +1109,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/status', (req, res) => {
   res.json({
-    status: 'online', version: '4.0.0 - Professional', uptime: process.uptime(),
+    status: 'online', version: ''4.2.0 - Bruno Trader Pro'', uptime: process.uptime(),
     analysisCount: state.analysisCount, signalsCount: state.signals.length,
     pendingTrades: state.pendingTrades.length, lastAnalysis: state.lastAnalysis,
     stats: state.stats,
