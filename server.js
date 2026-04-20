@@ -462,16 +462,21 @@ function analyzeVolume(candles) {
   const volumes = candles.map(c => c.volume);
   
   // Volume médio 24h (96 velas de 15min = 24h)
-  const avgVolume24h = volumes.slice(-96).reduce((a, b) => a + b, 0) / 96;
+  function analyzeVolume(candles) {
+  const volumes = candles.map(c => c.volume);
+  
+  const last96 = volumes.slice(-Math.min(96, volumes.length));
+  const avgVolume24h = last96.reduce((a, b) => a + b, 0) / last96.length;
+  
   const currentVolume = volumes[volumes.length - 1];
   const ratio = currentVolume / avgVolume24h;
   
-  // Volume Spike (> 2x média)
   const spike = ratio > 2.0;
   
-  // Volume crescente (últimas 3 velas)
   const last3Vol = volumes.slice(-3);
-  const increasing = last3Vol[2] > last3Vol[1] && last3Vol[1] > last3Vol[0];
+  const increasing = last3Vol.length === 3 &&
+    last3Vol[2] > last3Vol[1] &&
+    last3Vol[1] > last3Vol[0];
   
   return { 
     current: currentVolume, 
@@ -481,7 +486,7 @@ function analyzeVolume(candles) {
     increasing 
   };
 }
-
+  
 function detectSR(candles) {
   const currentPrice = candles[candles.length - 1].close;
   const levels = [];
