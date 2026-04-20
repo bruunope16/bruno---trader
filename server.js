@@ -462,9 +462,10 @@ function analyzeVolume(candles) {
   const volumes = candles.map(c => c.volume);
   
   // Volume médio 24h (96 velas de 15min = 24h)
-  function analyzeVolume(candles) {
+function analyzeVolume(candles) {
   const volumes = candles.map(c => c.volume);
   
+  // Volume médio 24h (96 velas de 15min = 24h)
   const last96 = volumes.slice(-Math.min(96, volumes.length));
   const avgVolume24h = last96.reduce((a, b) => a + b, 0) / last96.length;
   
@@ -474,16 +475,17 @@ function analyzeVolume(candles) {
   const spike = ratio > 2.0;
   
   const last3Vol = volumes.slice(-3);
-  const increasing = last3Vol.length === 3 &&
+  const increasing =
+    last3Vol.length === 3 &&
     last3Vol[2] > last3Vol[1] &&
     last3Vol[1] > last3Vol[0];
   
-  return { 
-    current: currentVolume, 
-    average: avgVolume24h, 
-    ratio, 
-    spike, 
-    increasing 
+  return {
+    current: currentVolume,
+    average: avgVolume24h,
+    ratio,
+    spike,
+    increasing
   };
 }
   
