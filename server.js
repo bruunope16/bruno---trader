@@ -31,14 +31,22 @@ const CONFIG = {
   
   // 🆕 FASE 2: Grupos de Correlação
   correlationGroups: {
-    highcap: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'],
-    layer1: ['SOLUSDT', 'AVAXUSDT', 'NEARUSDT', 'DOTUSDT'],
-    defi: ['AAVEUSDT', 'UNIUSDT', 'COMPUSDT', 'SUSHIUSDT', 'CRVUSDT'],
-    gaming: ['SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'GALAUSDT'' 'APEUSDT'],
-    meme: ['SHIBUSDT', 'PEPEUSDT', 'DOGEUSDT'],
-    others: ['ADAUSDT', 'XRPUSDT', 'MATICUSDT', 'LINKUSDT', 'LTCUSDT', 'ATOMUSDT', 
-             'XLMUSDT', 'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT', 'CAKEUSDT', 'IOTAUSDT']
-  },
+  highcap: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'],
+
+  layer1: ['SOLUSDT', 'AVAXUSDT', 'NEARUSDT', 'DOTUSDT'],
+
+  defi: ['AAVEUSDT', 'UNIUSDT', 'COMPUSDT', 'CRVUSDT'],
+
+  gaming: ['SANDUSDT', 'MANAUSDT', 'ENJUSDT'],
+
+  meme: ['SHIBUSDT', 'DOGEUSDT'],
+
+  others: [
+    'ADAUSDT', 'XRPUSDT', 'MATICUSDT', 'LINKUSDT',
+    'LTCUSDT', 'ATOMUSDT', 'XLMUSDT', 'ALGOUSDT',
+    'VETUSDT', 'ICPUSDT', 'FILUSDT', 'IOTAUSDT'
+  ]
+  }
   
   scoreWeights: {
     choch: 20, bos: 20, fibonacci: 10, orderBlock: 15, fvg: 15,
