@@ -352,6 +352,7 @@ function detectMarketStructure(candles) {
   swings: recent, 
   lastHigh: highs.length ? Math.max(...highs) : null, 
   lastLow: lows.length ? Math.min(...lows) : null 
+}
 };
 function calculateFibonacci(candles, marketStructure) {
   if (!marketStructure || !marketStructure.trend) return null;
