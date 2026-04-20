@@ -119,7 +119,76 @@ async function sendTelegram(message) {
   }
 }
 
-async function getCandlesticks(symbol, interval = '15m', limit = 200) {
+async function getCandlesticks(simbolo, intervalo = '15m', limite = 200) {
+  try {
+    const url = `https://api.binance.us/api/v3/klines`;
+    
+    const resposta = await axios.get(url, {
+      params: { 
+        symbol: simbolo, 
+        interval: intervalo, 
+        limit: limite 
+      },
+      timeout: 10000
+    });
+
+    if (!resposta.data || resposta.data.length === 0) {
+      throw new Error('Sem dados');
+    }
+
+    const candles = resposta.data.map((c, indice) => {
+      const abertura = parseFloat(c[1]);
+      const maxima = parseFloat(c[2]);
+      const minima = parseFloat(c[3]);
+      const fechamento = parseFloat(c[4]);
+      const volume = parseFloat(c[5]);
+
+      const corpo = Math.abs(fechamento - abertura);
+      const pavioSuperior = maxima - Math.max(abertura, fechamento);
+      const pavioInferior = Math.min(abertura, fechamento) - minima;
+      const range = maxima - minima;
+
+      return {
+        tempo: c[0] / 1000,
+        abertura,
+        maxima,
+        minima,
+        fechamento,
+        volume,
+
+        // Estrutura do candle
+        corpo,
+        range,
+        pavioSuperior,
+        pavioInferior,
+
+        // Direção
+        direcao: fechamento > abertura ? 1 : -1,
+        alta: fechamento > abertura,
+        baixa: fechamento < abertura,
+
+        // Ponto médio liquidez
+        meio: (maxima + minima) / 2,
+
+        // Índice
+        indice
+      };
+    });
+
+    // Volume médio
+    const volumeMedio =
+      candles.reduce((soma, c) => soma + c.volume, 0) / candles.length;
+
+    return candles.map(c => ({
+      ...c,
+      volumeMedio
+    }));
+
+  } catch (erro) {
+    addLog(`${simbolo}: erro ao buscar candles (${erro.message})`, 'error');
+    return null;
+  }
+} {
   try {
     const url = `https://api.binance.us/api/v3/klines`;
     const response = await axios.get(url, {
