@@ -13,7 +13,7 @@ const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: false });
 const CONFIG = {
   riskPerTrade: 0.02,
   leverage: 10,
-  initialBalance: 1000,
+  initialBalance: 100,
   maxPositions: 3,
   maxExposure: 0.06,        // 🆕 FASE 2: Máximo 6% exposição total
   
