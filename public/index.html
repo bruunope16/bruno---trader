@@ -608,8 +608,42 @@
             margin-bottom: 30px;
         }
         
+        /* 🆕 Filtros de logs */
+        .logs-filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .log-filter-btn {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .log-filter-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+        }
+        
+        .log-filter-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+        
         .logs-container {
-            max-height: 400px;
+            max-height: 600px;
             overflow-y: auto;
             padding-right: 10px;
             font-family: 'Fira Code', 'Consolas', monospace;
@@ -623,6 +657,7 @@
             border-left: 3px solid var(--border-color);
             display: flex;
             gap: 10px;
+            align-items: flex-start;
         }
         
         .log-item.log-success {
@@ -653,6 +688,13 @@
             color: var(--text-secondary);
             font-weight: 600;
             min-width: 70px;
+            flex-shrink: 0;
+        }
+        
+        .log-message {
+            flex: 1;
+            word-break: break-word;
+            white-space: pre-wrap;
         }
         
         /* Loading */
@@ -930,7 +972,28 @@
             <div class="section-title">
                 <span>📝</span>
                 <span>Logs do Sistema</span>
+                <span id="logs-counter" style="margin-left: auto; font-size: 12px; color: var(--text-secondary); font-weight: 400;">0 logs</span>
             </div>
+            
+            <!-- 🆕 FILTROS -->
+            <div class="logs-filters">
+                <button class="log-filter-btn active" data-filter="all">
+                    <span>📋</span> Todos
+                </button>
+                <button class="log-filter-btn" data-filter="success">
+                    <span>✅</span> Sinais
+                </button>
+                <button class="log-filter-btn" data-filter="warning">
+                    <span>⚠️</span> Rejeições
+                </button>
+                <button class="log-filter-btn" data-filter="error">
+                    <span>❌</span> Erros
+                </button>
+                <button class="log-filter-btn" data-filter="info">
+                    <span>ℹ️</span> Info
+                </button>
+            </div>
+            
             <div class="logs-container" id="logs">
                 <div class="loading">
                     <div class="spinner"></div>
@@ -945,6 +1008,56 @@
     <script>
         let lastSignalCount = 0;
         let lastAnalysisTime = null;
+        let currentLogFilter = 'all';  // 🆕 Filtro ativo
+        let allLogs = [];  // 🆕 Guarda todos os logs
+
+        // 🆕 Event listeners para filtros
+        document.querySelectorAll('.log-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove active de todos
+                document.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
+                // Adiciona active no clicado
+                btn.classList.add('active');
+                // Atualiza filtro atual
+                currentLogFilter = btn.dataset.filter;
+                // Re-renderiza logs
+                renderLogs();
+            });
+        });
+
+        // 🆕 Renderiza logs com filtro
+        function renderLogs() {
+            if (!allLogs || allLogs.length === 0) return;
+            
+            // Filtra logs baseado no filtro ativo
+            let filtered = allLogs;
+            if (currentLogFilter !== 'all') {
+                filtered = allLogs.filter(log => log.type === currentLogFilter);
+            }
+            
+            // Atualiza contador
+            document.getElementById('logs-counter').textContent = 
+                `${filtered.length} / ${allLogs.length} logs`;
+            
+            // Mostra até 100 logs
+            const toShow = filtered.slice(0, 100);
+            
+            if (toShow.length === 0) {
+                document.getElementById('logs').innerHTML = 
+                    '<div class="loading" style="padding: 20px;">Nenhum log com este filtro</div>';
+                return;
+            }
+            
+            const logsHTML = toShow.map(log => {
+                const time = new Date(log.timestamp).toLocaleTimeString('pt-BR');
+                return `<div class="log-item log-${log.type}">
+                    <span class="log-time">[${time}]</span>
+                    <span class="log-message">${log.message}</span>
+                </div>`;
+            }).join('');
+            
+            document.getElementById('logs').innerHTML = logsHTML;
+        }
 
         // Atualiza tempo desde última análise
         function updateLastAnalysisTime() {
@@ -1179,16 +1292,10 @@
                         '<div class="loading" style="padding: 20px;">Nenhum sinal ainda. Aguardando setup de qualidade...</div>';
                 }
                 
-                // Logs
+                // Logs - usa nova função com filtros
                 if (logsData.logs && logsData.logs.length > 0) {
-                    const logsHTML = logsData.logs.slice(0, 30).map(log => {
-                        const time = new Date(log.timestamp).toLocaleTimeString('pt-BR');
-                        return `<div class="log-item log-${log.type}">
-                            <span class="log-time">[${time}]</span>
-                            <span>${log.message}</span>
-                        </div>`;
-                    }).join('');
-                    document.getElementById('logs').innerHTML = logsHTML;
+                    allLogs = logsData.logs;
+                    renderLogs();
                 }
                 
                 // Busca stats detalhados se houver trades
