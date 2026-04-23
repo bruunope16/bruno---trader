@@ -20,7 +20,7 @@ const CONFIG = {
   riskMin: 0.005,            // Mínimo: 0.5% (emergency)
   riskMax: 0.03,             // Máximo: 3% (boost)
   leverage: 10,
-  initialBalance: 100,
+  initialBalance: 1000,
   maxPositions: 3,
   maxExposure: 0.06,         // Máximo 6% exposição total
   
