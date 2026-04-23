@@ -8,7 +8,8 @@ const PORT = process.env.PORT || 3000;
 
 // 🔒 SEGURANÇA: Usar variáveis de ambiente
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN || '8604695024:AAEycHa9v4L2ZmOBxP20i9ZuBSmE1hNndxM';
-const CHAT_ID = process.env.CHAT_ID || '1763009688';
+const CHAT_ID = process.env.CHAT_ID || '1763009688';           // Privado (só Bruno)
+const GROUP_ID = process.env.GROUP_ID || '-1003957383242';     // Grupo (Bruno + Pai)
 
 // Validação crítica
 if (!TELEGRAM_TOKEN || !CHAT_ID) {
@@ -21,11 +22,17 @@ if (!TELEGRAM_TOKEN || !CHAT_ID) {
 if (!process.env.TELEGRAM_TOKEN) {
   console.warn('⚠️ ATENÇÃO: Usando TELEGRAM_TOKEN do código (fallback)');
   console.warn('⚠️ Recomendado: configurar TELEGRAM_TOKEN no Render → Environment');
-  console.warn('⚠️ Dashboard → Environment → Add Environment Variable');
 }
 if (!process.env.CHAT_ID) {
   console.warn('⚠️ ATENÇÃO: Usando CHAT_ID do código (fallback)');
 }
+if (!process.env.GROUP_ID) {
+  console.warn('⚠️ ATENÇÃO: Usando GROUP_ID do código (fallback)');
+}
+
+console.log(`📱 Telegram configurado:`);
+console.log(`   Privado (Bruno): ${CHAT_ID}`);
+console.log(`   Grupo (Bruno+Pai): ${GROUP_ID}`);
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: false });
 
@@ -53,11 +60,11 @@ const CONFIG = {
     highcap: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'],
     layer1: ['SOLUSDT', 'AVAXUSDT', 'NEARUSDT', 'DOTUSDT'],
     defi: ['AAVEUSDT', 'UNIUSDT', 'COMPUSDT', 'SUSHIUSDT', 'CRVUSDT'],
-    gaming: ['SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'CHRUSDT', 'GALAUSDT', 'GMTUSDT', 'APEUSDT'],
+    gaming: ['SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'GALAUSDT', 'APEUSDT'],
     meme: ['SHIBUSDT', 'PEPEUSDT', 'DOGEUSDT'],
     others: ['ADAUSDT', 'XRPUSDT', 'MATICUSDT', 'LINKUSDT', 'LTCUSDT', 'ATOMUSDT', 
              'XLMUSDT', 'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT', 'CAKEUSDT', 
-             'BNXUSDT', 'IOTAUSDT']
+             'IOTAUSDT']
   },
   
   scoreWeights: {
@@ -89,14 +96,16 @@ const CONFIG = {
     'AAVEUSDT', 'COMPUSDT', 'SUSHIUSDT', 'CRVUSDT',
     
     // GAMING/METAVERSE - Verificados
-    'SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'CHRUSDT', 'GALAUSDT',
-    'GMTUSDT', 'APEUSDT',
+    'SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'GALAUSDT', 'APEUSDT',
     
     // MEME COINS - Verificados
     'SHIBUSDT', 'PEPEUSDT',
     
     // OUTROS - Verificados
-    'CAKEUSDT', 'BNXUSDT', 'IOTAUSDT'
+    'CAKEUSDT', 'IOTAUSDT'
+    
+    // REMOVIDOS (dados insuficientes na Binance.US):
+    // 'CHRUSDT', 'GMTUSDT', 'BNXUSDT'
   ]
 };
 
@@ -203,11 +212,20 @@ setInterval(() => {
 function addLog(message, type = 'info') {
   const log = { timestamp: new Date().toISOString(), message, type };
   state.logs.unshift(log);
-  if (state.logs.length > 500) state.logs.pop();
+  if (state.logs.length > 2000) state.logs.pop(); // 🆕 Aumentado de 500 para 2000 (mais histórico)
   console.log(`[${type.toUpperCase()}] ${message}`);
 }
 
-async function sendTelegram(message) {
+// ============================================
+// 🆕 FUNÇÕES DE ENVIO TELEGRAM (OPÇÃO C)
+// ============================================
+// sendToGroup   → Grupo (Bruno + Pai): sinais, TPs, resultados
+// sendToPrivate → Privado (só Bruno): erros, startup, alertas técnicos
+// sendTelegram  → Função legada (redireciona para grupo por padrão)
+// ============================================
+
+// Função interna - envia mensagem para um chat específico
+async function sendToChat(chatId, message, chatName = 'chat') {
   try {
     // 🆕 Limita mensagem a 4000 caracteres (limite Telegram é 4096)
     let finalMessage = message;
@@ -216,18 +234,29 @@ async function sendTelegram(message) {
       addLog(`⚠️ Mensagem truncada (${message.length} chars)`, 'warning');
     }
     
-    await bot.sendMessage(CHAT_ID, finalMessage);
-    addLog('✅ Telegram enviado com sucesso', 'success');
+    await bot.sendMessage(chatId, finalMessage);
+    addLog(`✅ Telegram enviado para ${chatName}`, 'success');
+    return true;
   } catch (error) {
-    addLog(`❌ ERRO TELEGRAM: ${error.message}`, 'error');
-    console.error('TELEGRAM ERROR:', error);
-    // Tenta enviar mensagem de erro simplificada
-    try {
-      await bot.sendMessage(CHAT_ID, `⚠️ Erro ao enviar sinal: ${error.message}`);
-    } catch (e) {
-      console.error('Falha total Telegram:', e);
-    }
+    addLog(`❌ ERRO TELEGRAM (${chatName}): ${error.message}`, 'error');
+    console.error(`TELEGRAM ERROR (${chatName}):`, error);
+    return false;
   }
+}
+
+// 🆕 Envia para o GRUPO (Bruno + Pai) - sinais e resultados de trade
+async function sendToGroup(message) {
+  return await sendToChat(GROUP_ID, message, 'GRUPO');
+}
+
+// 🆕 Envia para o PRIVADO (só Bruno) - erros e alertas do sistema
+async function sendToPrivate(message) {
+  return await sendToChat(CHAT_ID, message, 'PRIVADO');
+}
+
+// Função legada - mantida para compatibilidade, envia para o GRUPO por padrão
+async function sendTelegram(message) {
+  return await sendToGroup(message);
 }
 
 // ============================================
@@ -983,7 +1012,9 @@ async function analyzeSymbol(symbol) {
     if (ind15m.adx < CONFIG.minADX) {
       return { 
         valid: false, 
-        reason: `Mercado lateral (ADX: ${ind15m.adx.toFixed(1)} < ${CONFIG.minADX})` 
+        reason: `Mercado lateral (ADX: ${ind15m.adx.toFixed(1)} < ${CONFIG.minADX})`,
+        adx: ind15m.adx.toFixed(1),
+        direction: structure15m.trend === 'bullish' ? 'LONG' : 'SHORT'
       };
     }
     
@@ -993,7 +1024,10 @@ async function analyzeSymbol(symbol) {
     if (volume.ratio < CONFIG.volumeMultiplier) {
       return { 
         valid: false, 
-        reason: `Volume baixo (${volume.ratio.toFixed(2)}x < ${CONFIG.volumeMultiplier}x)` 
+        reason: `Volume baixo (${volume.ratio.toFixed(2)}x < ${CONFIG.volumeMultiplier}x)`,
+        volumeRatio: volume.ratio.toFixed(2),
+        adx: ind15m.adx.toFixed(1),
+        direction: structure15m.trend === 'bullish' ? 'LONG' : 'SHORT'
       };
     }
     
@@ -1105,10 +1139,24 @@ async function analyzeSymbol(symbol) {
       confluences.push(`Tendência ${structure15m.trend} alinhada 15m/1h/4h`);
       score += CONFIG.scoreWeights.trendAlignment;
     } else {
-      return { valid: false, reason: `Tendências desalinhadas (15m:${structure15m.trend} 1h:${structure1h.trend} 4h:${structure4h.trend})` };
+      return { 
+        valid: false, 
+        reason: `Tendências desalinhadas (15m:${structure15m.trend} 1h:${structure1h.trend} 4h:${structure4h.trend})`,
+        score: score,
+        volumeRatio: volume.ratio.toFixed(2),
+        adx: ind15m.adx.toFixed(1),
+        direction: structure15m.trend === 'bullish' ? 'LONG' : 'SHORT'
+      };
     }
     
-    if (score < CONFIG.minScore) return { valid: false, reason: `Score baixo: ${score}/${CONFIG.minScore}` };
+    if (score < CONFIG.minScore) return { 
+      valid: false, 
+      reason: `Score baixo: ${score}/${CONFIG.minScore}`,
+      score: score,
+      volumeRatio: volume.ratio.toFixed(2),
+      adx: ind15m.adx.toFixed(1),
+      direction: structure15m.trend === 'bullish' ? 'LONG' : 'SHORT'
+    };
     
     // 🆕 FASE 2: Verifica direção antes dos filtros finais
     const direction = structure15m.trend === 'bullish' ? 'LONG' : 'SHORT';
@@ -1215,18 +1263,38 @@ async function analyzeMarket() {
     
     // 🆕 FASE 2: Log com modo de risco
     const currentRisk = calculateDynamicRisk();
-    addLog(`=== Análise #${state.analysisCount} | Modo: ${state.riskMode.toUpperCase()} | Risco: ${(currentRisk * 100).toFixed(1)}% ===`, 'info');
+    
+    // 🆕 LOG DETALHADO: Início de ciclo
+    addLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+    addLog(`🔄 INICIANDO ANÁLISE #${state.analysisCount} | ${CONFIG.pairs.length} pares | Modo: ${state.riskMode.toUpperCase()} | Risco: ${(currentRisk * 100).toFixed(1)}%`, 'info');
+    addLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
     
     // 🆕 FASE 2: Verifica se pode abrir novos trades
     if (!canTakeNewTrade()) {
-      addLog('Não pode abrir novos trades agora', 'warning');
+      addLog('⏸️ Não pode abrir novos trades agora', 'warning');
       return;
     }
     
     const results = [];
     
+    // 🆕 CONTADORES DE REJEIÇÃO para resumo final
+    const rejectionStats = {
+      volumeBaixo: 0,
+      scoreBaixo: 0,
+      adxBaixo: 0,
+      tendenciaDesalinhada: 0,
+      semEstrutura: 0,
+      dadosInsuficientes: 0,
+      correlacao: 0,
+      sinalRecente: 0,
+      stopProximo: 0,
+      rrBaixo: 0,
+      spreadAlto: 0,
+      tpInvalido: 0,
+      outros: 0
+    };
+    
     // 🚀 OTIMIZAÇÃO: Analisa em batches de 5 pares em paralelo
-    // 36 pares sequenciais ~60s → 36 pares em batches ~12s
     const BATCH_SIZE = 5;
     for (let i = 0; i < CONFIG.pairs.length; i += BATCH_SIZE) {
       const batch = CONFIG.pairs.slice(i, i + BATCH_SIZE);
@@ -1236,20 +1304,53 @@ async function analyzeMarket() {
           try {
             return await analyzeSymbol(symbol);
           } catch (error) {
-            addLog(`Erro em ${symbol}: ${error.message}`, 'error');
+            addLog(`❌ ${symbol.padEnd(10)} | ERRO: ${error.message}`, 'error');
             return { valid: false, reason: `Erro: ${error.message}`, symbol };
           }
         })
       );
       
-      // Processa resultados do batch
+      // 🆕 Processa resultados do batch com LOGS DETALHADOS
       batchResults.forEach((result, idx) => {
         const symbol = batch[idx];
+        
         if (result.valid) {
+          // ✅ SINAL VÁLIDO - log completo
           results.push(result);
-          addLog(`${symbol}: SETUP! Score ${result.score}`, 'success');
+          addLog(
+            `✅ ${symbol.padEnd(10)} | ${result.direction.padEnd(5)} | Score: ${String(result.score).padStart(3)} | Vol: ${result.volumeRatio}x | ADX: ${result.adx} | 🎯 SETUP VÁLIDO!`, 
+            'success'
+          );
         } else {
-          addLog(`${symbol}: ${result.reason}`, 'warning');
+          // ❌ SINAL REJEITADO - log detalhado com motivo
+          const reason = result.reason || 'Desconhecido';
+          
+          // Dados disponíveis (se houver)
+          const score = result.score !== undefined ? String(result.score).padStart(3) : ' --';
+          const volume = result.volumeRatio !== undefined ? `${result.volumeRatio}x` : ' --';
+          const adx = result.adx !== undefined ? result.adx : '--';
+          const direction = result.direction || '----';
+          
+          // Emoji baseado no tipo de rejeição
+          let icon = '⚪';
+          if (reason.includes('Volume baixo')) { icon = '📉'; rejectionStats.volumeBaixo++; }
+          else if (reason.includes('Score baixo')) { icon = '🎯'; rejectionStats.scoreBaixo++; }
+          else if (reason.includes('Mercado lateral') || reason.includes('ADX')) { icon = '〰️'; rejectionStats.adxBaixo++; }
+          else if (reason.includes('Tendências desalinhadas')) { icon = '🔀'; rejectionStats.tendenciaDesalinhada++; }
+          else if (reason.includes('Sem estrutura')) { icon = '🏗️'; rejectionStats.semEstrutura++; }
+          else if (reason.includes('insuficientes') || reason.includes('Sem dados')) { icon = '📡'; rejectionStats.dadosInsuficientes++; }
+          else if (reason.includes('Grupo')) { icon = '🔗'; rejectionStats.correlacao++; }
+          else if (reason.includes('Sinal recente')) { icon = '⏰'; rejectionStats.sinalRecente++; }
+          else if (reason.includes('Stop muito próximo')) { icon = '🛑'; rejectionStats.stopProximo++; }
+          else if (reason.includes('R:R baixo')) { icon = '⚖️'; rejectionStats.rrBaixo++; }
+          else if (reason.includes('Spread alto')) { icon = '💨'; rejectionStats.spreadAlto++; }
+          else if (reason.includes('TP')) { icon = '🎯'; rejectionStats.tpInvalido++; }
+          else { rejectionStats.outros++; }
+          
+          addLog(
+            `${icon} ${symbol.padEnd(10)} | ${direction.padEnd(5)} | Score: ${score} | Vol: ${volume.padEnd(6)} | ADX: ${adx} | ❌ ${reason}`,
+            'warning'
+          );
         }
       });
       
@@ -1258,6 +1359,31 @@ async function analyzeMarket() {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
+    
+    // 🆕 LOG DETALHADO: Resumo do ciclo
+    addLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
+    addLog(`✅ Análise #${state.analysisCount} COMPLETA | ${CONFIG.pairs.length} pares | ${results.length} setups válidos`, 'success');
+    
+    // Resumo das rejeições (só mostra categorias que tiveram rejeição)
+    const rejectionSummary = [];
+    if (rejectionStats.volumeBaixo > 0) rejectionSummary.push(`📉 ${rejectionStats.volumeBaixo} volume baixo`);
+    if (rejectionStats.scoreBaixo > 0) rejectionSummary.push(`🎯 ${rejectionStats.scoreBaixo} score baixo`);
+    if (rejectionStats.adxBaixo > 0) rejectionSummary.push(`〰️ ${rejectionStats.adxBaixo} ADX baixo`);
+    if (rejectionStats.tendenciaDesalinhada > 0) rejectionSummary.push(`🔀 ${rejectionStats.tendenciaDesalinhada} tendência desalinhada`);
+    if (rejectionStats.semEstrutura > 0) rejectionSummary.push(`🏗️ ${rejectionStats.semEstrutura} sem estrutura`);
+    if (rejectionStats.dadosInsuficientes > 0) rejectionSummary.push(`📡 ${rejectionStats.dadosInsuficientes} dados insuficientes`);
+    if (rejectionStats.correlacao > 0) rejectionSummary.push(`🔗 ${rejectionStats.correlacao} correlação`);
+    if (rejectionStats.sinalRecente > 0) rejectionSummary.push(`⏰ ${rejectionStats.sinalRecente} sinal recente`);
+    if (rejectionStats.stopProximo > 0) rejectionSummary.push(`🛑 ${rejectionStats.stopProximo} stop próximo`);
+    if (rejectionStats.rrBaixo > 0) rejectionSummary.push(`⚖️ ${rejectionStats.rrBaixo} R:R baixo`);
+    if (rejectionStats.spreadAlto > 0) rejectionSummary.push(`💨 ${rejectionStats.spreadAlto} spread alto`);
+    if (rejectionStats.tpInvalido > 0) rejectionSummary.push(`🎯 ${rejectionStats.tpInvalido} TP inválido`);
+    if (rejectionStats.outros > 0) rejectionSummary.push(`⚪ ${rejectionStats.outros} outros`);
+    
+    if (rejectionSummary.length > 0) {
+      addLog(`📊 RESUMO: ${rejectionSummary.join(' | ')}`, 'info');
+    }
+    addLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'info');
     
     results.sort((a, b) => b.score - a.score);
     const topSignals = results.slice(0, 1);
@@ -1400,7 +1526,7 @@ ${confluencesText}
       }
       
       // Envia mensagem de texto
-      await sendTelegram(message);
+      await sendToGroup(message);
       
       // 🆕 SISTEMA "LEARNING": Aguarda confirmação de toque na zona de entrada
       // Trade só fica ATIVO após o preço tocar a zona (±0.3% do entry)
@@ -1483,13 +1609,13 @@ async function checkTradeResults() {
           trade.status = 'active';
           trade.activatedAt = new Date().toISOString();
           addLog(`${trade.symbol}: ✅ Entrada CONFIRMADA - trade ativo`, 'success');
-          await sendTelegram(`✅ ${trade.symbol} ${trade.direction}\n\nEntrada CONFIRMADA!\nPreço tocou a zona de entrada.\nTrade agora ATIVO.\n\n🎯 Monitorando TPs e Stop...`);
+          await sendToGroup(`✅ ${trade.symbol} ${trade.direction}\n\nEntrada CONFIRMADA!\nPreço tocou a zona de entrada.\nTrade agora ATIVO.\n\n🎯 Monitorando TPs e Stop...`);
         } else {
           // Se passou mais de 4h sem tocar, cancela o sinal
           const hoursElapsed = (Date.now() - (trade.signalTime || Date.now())) / (1000 * 60 * 60);
           if (hoursElapsed > 4) {
             addLog(`${trade.symbol}: ❌ Sinal expirado (4h sem toque na zona)`, 'warning');
-            await sendTelegram(`⏰ ${trade.symbol} ${trade.direction}\n\nSinal EXPIRADO.\nPreço não tocou a zona de entrada em 4h.\n\n📊 Sem trade executado.`);
+            await sendToGroup(`⏰ ${trade.symbol} ${trade.direction}\n\nSinal EXPIRADO.\nPreço não tocou a zona de entrada em 4h.\n\n📊 Sem trade executado.`);
             state.pendingTrades.splice(i, 1);
           }
           continue; // Não processa TPs/Stop se ainda não foi ativado
@@ -1506,14 +1632,14 @@ async function checkTradeResults() {
         trade.stopLoss = formatPrice(entry);
         trade.reachedTP1 = true;
         addLog(`${trade.symbol}: TP1 atingido! Stop → Breakeven`, 'success');
-        await sendTelegram(`🟢 ${trade.symbol} LONG\n\nTP1 atingido!\nStop movido para breakeven: $${formatPrice(entry)}\n\n✅ Capital protegido!`);
+        await sendToGroup(`🟢 ${trade.symbol} LONG\n\nTP1 atingido!\nStop movido para breakeven: $${formatPrice(entry)}\n\n✅ Capital protegido!`);
       }
       
       // TP2 batido: Ativa trailing stop
       if (currentPrice >= tp2 && trade.reachedTP1 && !trade.trailingActive) {
         trade.trailingActive = true;
         addLog(`${trade.symbol}: TP2 atingido! Trailing stop ativo`, 'success');
-        await sendTelegram(`🟢 ${trade.symbol} LONG\n\nTP2 atingido!\nTrailing Stop ATIVO!\n\n⚡ Seguindo o movimento...`);
+        await sendToGroup(`🟢 ${trade.symbol} LONG\n\nTP2 atingido!\nTrailing Stop ATIVO!\n\n⚡ Seguindo o movimento...`);
       }
       
       // Trailing stop ativo: Ajusta stop
@@ -1534,7 +1660,7 @@ async function checkTradeResults() {
         if (momentum.weakening) {
           trade.weaknessAlerted = true; // Só alerta uma vez
           addLog(`${trade.symbol}: ⚠️ Momentum enfraquecendo`, 'warning');
-          await sendTelegram(`⚠️ ${trade.symbol} LONG - MOMENTUM FRACO
+          await sendToGroup(`⚠️ ${trade.symbol} LONG - MOMENTUM FRACO
 
 Sinais detectados:
 ${momentum.signals.map(s => '• ' + s).join('\n')}
@@ -1593,13 +1719,13 @@ ${momentum.signals.map(s => '• ' + s).join('\n')}
         trade.stopLoss = formatPrice(entry);
         trade.reachedTP1 = true;
         addLog(`${trade.symbol}: TP1 atingido! Stop → Breakeven`, 'success');
-        await sendTelegram(`🟢 ${trade.symbol} SHORT\n\nTP1 atingido!\nStop movido para breakeven: $${formatPrice(entry)}\n\n✅ Capital protegido!`);
+        await sendToGroup(`🟢 ${trade.symbol} SHORT\n\nTP1 atingido!\nStop movido para breakeven: $${formatPrice(entry)}\n\n✅ Capital protegido!`);
       }
       
       if (currentPrice <= tp2 && trade.reachedTP1 && !trade.trailingActive) {
         trade.trailingActive = true;
         addLog(`${trade.symbol}: TP2 atingido! Trailing stop ativo`, 'success');
-        await sendTelegram(`🟢 ${trade.symbol} SHORT\n\nTP2 atingido!\nTrailing Stop ATIVO!\n\n⚡ Seguindo o movimento...`);
+        await sendToGroup(`🟢 ${trade.symbol} SHORT\n\nTP2 atingido!\nTrailing Stop ATIVO!\n\n⚡ Seguindo o movimento...`);
       }
       
       if (trade.trailingActive) {
@@ -1619,7 +1745,7 @@ ${momentum.signals.map(s => '• ' + s).join('\n')}
         if (momentum.weakening) {
           trade.weaknessAlerted = true;
           addLog(`${trade.symbol}: ⚠️ Momentum enfraquecendo`, 'warning');
-          await sendTelegram(`⚠️ ${trade.symbol} SHORT - MOMENTUM FRACO
+          await sendToGroup(`⚠️ ${trade.symbol} SHORT - MOMENTUM FRACO
 
 Sinais detectados:
 ${momentum.signals.map(s => '• ' + s).join('\n')}
@@ -1790,7 +1916,7 @@ ${result.outcome === 'WIN' ? '✅' : '❌'} Profit: ${profitSign}${result.profit
 💰 Risco Dinâmico + Correlação
 🕐 Session Filters`;
   
-  await sendTelegram(msg);
+  await sendToGroup(msg);
   addLog(`${emoji} ${trade.symbol}: ${result.outcome} (${profitSign}${result.profit.toFixed(2)}%)`, result.outcome === 'WIN' ? 'success' : 'error');
 }
 
@@ -1960,7 +2086,7 @@ app.listen(PORT, async () => {
   addLog(`✅ FASE 2: Risco Dinâmico + Correlação + Sessions`, 'success');
   addLog(`✅ FASE 3: SMC REAL + Dados Precisos`, 'success');
   
-  await sendTelegram(`🚀 BRUNO TRADER PRO V5.0 - SISTEMA COMPLETO
+  await sendToPrivate(`🚀 BRUNO TRADER PRO V5.0 - SISTEMA COMPLETO
 
 ━━━━━━━━━━━━━━━━━━
 
