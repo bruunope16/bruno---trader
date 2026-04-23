@@ -10,26 +10,44 @@ const CHAT_ID = '1763009688';
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: false });
 
+// ============================================
+// CONFIGURAÇÃO V5.0 - PROFISSIONAL COMPLETO
+// ============================================
+
 const CONFIG = {
-  riskPerTrade: 0.02,
+  // Gestão de Risco Dinâmica
+  riskPerTrade: 0.02,        // Base: 2%
+  riskMin: 0.005,            // Mínimo: 0.5% (emergency)
+  riskMax: 0.03,             // Máximo: 3% (boost)
   leverage: 10,
-  initialBalance: 100,
+  initialBalance: 1000,
   maxPositions: 3,
-  maxExposure: 0.06,        // 🆕 FASE 2: Máximo 6% exposição total
+  maxExposure: 0.06,         // Máximo 6% exposição total
   
-  // FASE 1 - Novidades
-  minADX: 20,               // 🆕 Filtro ADX
-  volumeMultiplier: 1.2,    // 🔧 AJUSTADO: era 1.5 (muito restritivo)
+  // Score e Filtros
+  minScore: 65,              // Reduzido de 70 para pegar mais sinais
+  highConfidence: 85,
+  atrMultiplier: 3.0,        // Stop mais largo (era 1.5)
+  volumeMultiplier: 1.5,     // Volume mínimo (melhorado)
+  minADX: 20,                // ADX mínimo para operar
   
   // Trailing Stop
   trailing: {
     enabled: true,
-    breakeven: true,        // 🆕 Move para breakeven em TP1
-    trailingATR: 1.5,      // 🆕 Trailing em TP2
-    closeOnTP3: true       // 🆕 Fecha tudo em TP3
+    breakeven: true,         // Move para breakeven em TP1
+    trailingATR: 1.5,       // Trailing em TP2
+    closeOnTP3: true        // Fecha tudo em TP3
   },
   
-  // 🆕 FASE 2: Grupos de Correlação
+  // TP Parcial
+  tpPartial: {
+    enabled: true,
+    tp1Percent: 50,          // 50% em TP1
+    tp2Percent: 30,          // 30% em TP2
+    tp3Percent: 20           // 20% em TP3
+  },
+  
+  // Grupos de Correlação
   correlationGroups: {
     highcap: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'],
     layer1: ['SOLUSDT', 'AVAXUSDT', 'NEARUSDT', 'DOTUSDT'],
@@ -41,42 +59,15 @@ const CONFIG = {
              'BNXUSDT', 'IOTAUSDT']
   },
   
-  scoreWeights: {
-    choch: 20, bos: 20, fibonacci: 10, orderBlock: 15, fvg: 15,
-    liquidity: 20, emaTrend: 20, macd: 10, rsi: 10, sr: 10,
-    volumeSpike: 15, trendAlignment: 20, adxBonus: 10  // 🆕 ADX bonus
-  },
-  
-  minScore: 65,              // Reduzido de 70
-  highConfidence: 85,
-  atrMultiplier: 3.0,        // Stop mais largo
-  
-  // Sistema de TP Parcial
-  tpPartial: {
-    enabled: true,
-    tp1Percent: 50,
-    tp2Percent: 30,
-    tp3Percent: 20
-  },
-  
+  // Pares (37 verificados)
   pairs: [
-    // TOP COINS - 100% Verificados Binance.US
     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
     'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT',
     'LINKUSDT', 'LTCUSDT', 'UNIUSDT', 'ATOMUSDT', 'XLMUSDT',
     'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT', 'NEARUSDT',
-    
-    // DEFI - Verificados
     'AAVEUSDT', 'COMPUSDT', 'SUSHIUSDT', 'CRVUSDT',
-    
-    // GAMING/METAVERSE - Verificados
     'SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'CHRUSDT', 'GALAUSDT',
-    'GMTUSDT', 'APEUSDT',
-    
-    // MEME COINS - Verificados
-    'SHIBUSDT', 'PEPEUSDT',
-    
-    // OUTROS - Verificados
+    'GMTUSDT', 'APEUSDT', 'SHIBUSDT', 'PEPEUSDT',
     'CAKEUSDT', 'BNXUSDT', 'IOTAUSDT'
   ]
 };
@@ -92,16 +83,19 @@ let state = {
     losses: 0, 
     totalProfit: 0, 
     winRate: 0,
-    consecutiveWins: 0,      // 🆕 FASE 2: Risco Dinâmico
-    consecutiveLosses: 0,    // 🆕 FASE 2: Risco Dinâmico
-    maxDrawdown: 0           // 🆕 FASE 2: Risco Dinâmico
+    consecutiveWins: 0,
+    consecutiveLosses: 0,
+    maxDrawdown: 0
   },
   analysisCount: 0,
   logs: [],
   lastAnalysis: null,
-  trailingStops: {},
-  riskMode: 'normal'  // 🆕 FASE 2: normal | recovery | boost | emergency
+  riskMode: 'normal' // normal | recovery | boost | emergency
 };
+
+// ============================================
+// FUNÇÕES AUXILIARES
+// ============================================
 
 function addLog(message, type = 'info') {
   const log = { timestamp: new Date().toISOString(), message, type };
@@ -112,223 +106,19 @@ function addLog(message, type = 'info') {
 
 async function sendTelegram(message) {
   try {
-    // 🆕 Limita mensagem a 4000 caracteres (limite Telegram é 4096)
-    let finalMessage = message;
-    if (message.length > 4000) {
-      finalMessage = message.substring(0, 3950) + '\n\n... (mensagem truncada)';
-      addLog(`⚠️ Mensagem truncada (${message.length} chars)`, 'warning');
-    }
-    
-    await bot.sendMessage(CHAT_ID, finalMessage);
-    addLog('✅ Telegram enviado com sucesso', 'success');
+    await bot.sendMessage(CHAT_ID, message);
+    addLog('Telegram enviado', 'success');
   } catch (error) {
-    addLog(`❌ ERRO TELEGRAM: ${error.message}`, 'error');
-    console.error('TELEGRAM ERROR:', error);
-    // Tenta enviar mensagem de erro simplificada
-    try {
-      await bot.sendMessage(CHAT_ID, `⚠️ Erro ao enviar sinal: ${error.message}`);
-    } catch (e) {
-      console.error('Falha total Telegram:', e);
-    }
+    addLog(`Erro Telegram: ${error.message}`, 'error');
   }
 }
 
-// ============================================
-// 🆕 FASE 3: GERAÇÃO DE GRÁFICO PROFISSIONAL
-// ============================================
-
-const fs = require('fs');
-const { createCanvas } = require('canvas');
-
-async function generateChartImage(signal, candles15m) {
-  try {
-    addLog('📊 Gerando gráfico...', 'info');
-    
-    const width = 1200;
-    const height = 800;
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
-    
-    // Background escuro profissional
-    ctx.fillStyle = '#0a0e27';
-    ctx.fillRect(0, 0, width, height);
-    
-    // Título
-    ctx.fillStyle = '#00d4ff';
-    ctx.font = 'bold 24px Arial';
-    ctx.fillText(`📊 ${signal.symbol} ${signal.direction} | Score: ${signal.score}/100 | ADX: ${signal.adx}`, 20, 40);
-    
-    // Área do gráfico
-    const chartX = 80;
-    const chartY = 80;
-    const chartWidth = width - 160;
-    const chartHeight = height - 250;
-    
-    // Pega últimas 100 velas
-    const last100 = candles15m.slice(-100);
-    const prices = last100.map(c => [c.open, c.high, c.low, c.close]).flat();
-    const maxPrice = Math.max(...prices);
-    const minPrice = Math.min(...prices);
-    const priceRange = maxPrice - minPrice;
-    
-    // Função para converter preço em Y
-    const priceToY = (price) => {
-      return chartY + chartHeight - ((price - minPrice) / priceRange * chartHeight);
-    };
-    
-    // Desenha grid
-    ctx.strokeStyle = '#1a1f3a';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 10; i++) {
-      const y = chartY + (chartHeight / 10) * i;
-      ctx.beginPath();
-      ctx.moveTo(chartX, y);
-      ctx.lineTo(chartX + chartWidth, y);
-      ctx.stroke();
-      
-      // Labels de preço
-      const price = maxPrice - (priceRange / 10) * i;
-      ctx.fillStyle = '#666';
-      ctx.font = '12px Arial';
-      ctx.fillText('$' + price.toFixed(2), 10, y + 4);
-    }
-    
-    // Desenha candlesticks
-    const candleWidth = chartWidth / last100.length;
-    last100.forEach((candle, i) => {
-      const x = chartX + i * candleWidth;
-      const openY = priceToY(candle.open);
-      const closeY = priceToY(candle.close);
-      const highY = priceToY(candle.high);
-      const lowY = priceToY(candle.low);
-      
-      const isGreen = candle.close > candle.open;
-      
-      // Sombra (high-low)
-      ctx.strokeStyle = isGreen ? '#00ff88' : '#ff4444';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x + candleWidth/2, highY);
-      ctx.lineTo(x + candleWidth/2, lowY);
-      ctx.stroke();
-      
-      // Corpo
-      ctx.fillStyle = isGreen ? '#00ff88' : '#ff4444';
-      const bodyY = Math.min(openY, closeY);
-      const bodyHeight = Math.abs(closeY - openY) || 1;
-      ctx.fillRect(x + 1, bodyY, candleWidth - 2, bodyHeight);
-    });
-    
-    // Calcula EMA 20
-    const ema20Values = [];
-    let ema = last100[0].close;
-    const multiplier = 2 / (20 + 1);
-    last100.forEach(candle => {
-      ema = (candle.close - ema) * multiplier + ema;
-      ema20Values.push(ema);
-    });
-    
-    // Desenha EMA 20
-    ctx.strokeStyle = '#00d4ff';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ema20Values.forEach((ema, i) => {
-      const x = chartX + i * candleWidth + candleWidth/2;
-      const y = priceToY(ema);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    
-    // Desenha níveis do trade
-    const entryPrice = parseFloat(signal.entry);
-    const stopPrice = parseFloat(signal.stopLoss);
-    const tp1Price = parseFloat(signal.tp1);
-    const tp2Price = parseFloat(signal.tp2);
-    const tp3Price = parseFloat(signal.tp3);
-    
-    // Linha de entrada (azul)
-    ctx.strokeStyle = '#00d4ff';
-    ctx.lineWidth = 3;
-    ctx.setLineDash([10, 5]);
-    ctx.beginPath();
-    ctx.moveTo(chartX + chartWidth * 0.8, priceToY(entryPrice));
-    ctx.lineTo(chartX + chartWidth, priceToY(entryPrice));
-    ctx.stroke();
-    ctx.setLineDash([]);
-    
-    // Label entrada
-    ctx.fillStyle = '#00d4ff';
-    ctx.font = 'bold 14px Arial';
-    ctx.fillText(`📍 ENTRADA: $${entryPrice.toFixed(2)}`, chartX + chartWidth - 200, priceToY(entryPrice) - 10);
-    
-    // Stop Loss (vermelho)
-    ctx.strokeStyle = '#ff4444';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
-    ctx.beginPath();
-    ctx.moveTo(chartX + chartWidth * 0.8, priceToY(stopPrice));
-    ctx.lineTo(chartX + chartWidth, priceToY(stopPrice));
-    ctx.stroke();
-    ctx.setLineDash([]);
-    
-    ctx.fillStyle = '#ff4444';
-    ctx.font = '12px Arial';
-    ctx.fillText(`🛑 STOP: $${stopPrice.toFixed(2)}`, chartX + chartWidth - 200, priceToY(stopPrice) - 10);
-    
-    // TPs (verde)
-    [tp1Price, tp2Price, tp3Price].forEach((tp, idx) => {
-      ctx.strokeStyle = '#00ff88';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.moveTo(chartX + chartWidth * 0.8, priceToY(tp));
-      ctx.lineTo(chartX + chartWidth, priceToY(tp));
-      ctx.stroke();
-      ctx.setLineDash([]);
-      
-      ctx.fillStyle = '#00ff88';
-      ctx.font = '12px Arial';
-      ctx.fillText(`🎯 TP${idx+1}: $${tp.toFixed(2)}`, chartX + chartWidth - 200, priceToY(tp) + 15);
-    });
-    
-    // Volume (painel inferior)
-    const volumeY = chartY + chartHeight + 30;
-    const volumeHeight = 80;
-    const volumes = last100.map(c => c.volume);
-    const maxVolume = Math.max(...volumes);
-    
-    volumes.forEach((vol, i) => {
-      const x = chartX + i * candleWidth;
-      const h = (vol / maxVolume) * volumeHeight;
-      ctx.fillStyle = 'rgba(100, 150, 255, 0.5)';
-      ctx.fillRect(x + 1, volumeY + volumeHeight - h, candleWidth - 2, h);
-    });
-    
-    // Label volume
-    ctx.fillStyle = '#666';
-    ctx.font = '12px Arial';
-    ctx.fillText('Volume', 10, volumeY + volumeHeight/2);
-    
-    // Info footer
-    ctx.fillStyle = '#00d4ff';
-    ctx.font = '14px Arial';
-    const timestamp = new Date().toLocaleString('pt-BR');
-    ctx.fillText(`🤖 Bruno Trader Pro V5.0 | ${timestamp}`, 20, height - 20);
-    
-    // Salva imagem
-    const filename = `/tmp/chart_${Date.now()}.png`;
-    const buffer = canvas.toBuffer('image/png');
-    fs.writeFileSync(filename, buffer);
-    
-    addLog(`✅ Gráfico gerado: ${filename}`, 'success');
-    return filename;
-    
-  } catch (error) {
-    addLog(`❌ Erro ao gerar gráfico: ${error.message}`, 'error');
-    console.error('CHART ERROR:', error);
-    return null;
-  }
+function formatPrice(price) {
+  const p = parseFloat(price);
+  if (p >= 1000) return p.toFixed(2);
+  if (p >= 1) return p.toFixed(4);
+  if (p >= 0.01) return p.toFixed(6);
+  return p.toFixed(8);
 }
 
 async function getCandlesticks(symbol, interval = '15m', limit = 200) {
@@ -342,26 +132,20 @@ async function getCandlesticks(symbol, interval = '15m', limit = 200) {
     if (!response.data || response.data.length === 0) throw new Error('Sem dados');
     
     return response.data.map(c => ({
-      time: c[0], open: parseFloat(c[1]), high: parseFloat(c[2]),
-      low: parseFloat(c[3]), close: parseFloat(c[4]), volume: parseFloat(c[5])
+      time: c[0], 
+      open: parseFloat(c[1]), 
+      high: parseFloat(c[2]),
+      low: parseFloat(c[3]), 
+      close: parseFloat(c[4]), 
+      volume: parseFloat(c[5])
     }));
   } catch (error) {
     return null;
   }
 }
 
-function formatPrice(price) {
-  if (price >= 1000) return price.toFixed(2);
-  if (price >= 100) return price.toFixed(3);
-  if (price >= 10) return price.toFixed(4);
-  if (price >= 1) return price.toFixed(5);
-  if (price >= 0.1) return price.toFixed(6);
-  if (price >= 0.01) return price.toFixed(7);
-  return price.toFixed(8);
-}
-
 // ============================================
-// 🆕 FASE 2: GESTÃO DE RISCO DINÂMICA
+// GESTÃO DE RISCO DINÂMICA
 // ============================================
 
 function calculateDynamicRisk() {
@@ -372,21 +156,21 @@ function calculateDynamicRisk() {
   if (drawdown > 0.10) {
     state.riskMode = 'emergency';
     addLog('⚠️ EMERGENCY MODE: Drawdown > 10%', 'warning');
-    return 0.005; // 0.5%
+    return CONFIG.riskMin; // 0.5%
   }
   
   // Recovery Mode: 2+ losses seguidas
   if (consecutiveLosses >= 2) {
     state.riskMode = 'recovery';
     addLog('📉 Recovery Mode: 2+ losses', 'warning');
-    return 0.01; // 1%
+    return CONFIG.riskPerTrade * 0.5; // 1%
   }
   
   // Boost Mode: 3+ wins seguidas
   if (consecutiveWins >= 3) {
     state.riskMode = 'boost';
     addLog('📈 Boost Mode: 3+ wins', 'success');
-    return 0.03; // 3%
+    return CONFIG.riskMax; // 3%
   }
   
   // Normal Mode
@@ -396,8 +180,7 @@ function calculateDynamicRisk() {
 
 function canTakeNewTrade() {
   const activeTrades = state.pendingTrades.length;
-  const currentRisk = calculateDynamicRisk();
-  const totalExposure = activeTrades * currentRisk;
+  const totalExposure = activeTrades * calculateDynamicRisk();
   
   if (activeTrades >= CONFIG.maxPositions) {
     addLog(`Máximo de ${CONFIG.maxPositions} posições ativas`, 'warning');
@@ -413,18 +196,19 @@ function canTakeNewTrade() {
 }
 
 // ============================================
-// 🆕 FASE 2: FILTRO DE CORRELAÇÃO
+// FILTRO DE CORRELAÇÃO
 // ============================================
 
 function findCorrelationGroup(symbol) {
   for (const [groupName, pairs] of Object.entries(CONFIG.correlationGroups)) {
     if (pairs.includes(symbol)) return groupName;
   }
-  return 'others';
+  return null;
 }
 
 function hasActiveTradeInGroup(symbol, direction) {
   const group = findCorrelationGroup(symbol);
+  if (!group) return false;
   
   return state.pendingTrades.some(trade => {
     const tradeGroup = findCorrelationGroup(trade.symbol);
@@ -433,7 +217,7 @@ function hasActiveTradeInGroup(symbol, direction) {
 }
 
 // ============================================
-// 🆕 FASE 2: SESSION FILTERS (Horários Premium)
+// SESSION FILTERS (Horários Premium)
 // ============================================
 
 function getSessionScore() {
@@ -454,525 +238,434 @@ function getSessionScore() {
   return 0; // Horário normal
 }
 
-
 // ============================================
-// 🆕 FASE 3: DETECÇÃO REAL DE MARKET STRUCTURE
+// ANÁLISE TÉCNICA COM DADOS REAIS
 // ============================================
 
-function detectMarketStructure(candles) {
-  const len = candles.length;
-  const swings = [];
-  
-  // Detecta swing highs e lows com confirmação mais forte
-  for (let i = 5; i < len - 5; i++) {
-    const current = candles[i];
-    const before = candles.slice(i - 5, i);
-    const after = candles.slice(i + 1, i + 6);
-    
-    // Swing High: pico confirmado
-    if (before.every(c => c.high < current.high) && after.every(c => c.high < current.high)) {
-      swings.push({ index: i, type: 'high', price: current.high, time: current.time });
-    }
-    
-    // Swing Low: vale confirmado
-    if (before.every(c => c.low > current.low) && after.every(c => c.low > current.low)) {
-      swings.push({ index: i, type: 'low', price: current.low, time: current.time });
-    }
-  }
-  
-  if (swings.length < 4) return null;
-  
-  // 🆕 FASE 3: CHoCH e BOS REAIS
-  const recent = swings.slice(-6); // Analisa últimos 6 swings
-  let trend = null, structure = null, choch = false, bos = false;
-  
-  const highs = recent.filter(s => s.type === 'high');
-  const lows = recent.filter(s => s.type === 'low');
-  
-  if (highs.length >= 2 && lows.length >= 2) {
-    const lastHigh = highs[highs.length - 1].price;
-    const prevHigh = highs[highs.length - 2].price;
-    const lastLow = lows[lows.length - 1].price;
-    const prevLow = lows[lows.length - 2].price;
-    
-    // Tendência de alta: HH + HL
-    if (lastHigh > prevHigh && lastLow > prevLow) {
-      trend = 'bullish';
-      structure = 'HH + HL';
-    }
-    // Tendência de baixa: LH + LL
-    else if (lastHigh < prevHigh && lastLow < prevLow) {
-      trend = 'bearish';
-      structure = 'LH + LL';
-    }
-  }
-  
-  // 🆕 FASE 3: CHoCH (Change of Character) REAL
-  // CHoCH = quebra da estrutura interna
-  if (recent.length >= 4) {
-    const currentPrice = candles[len - 1].close;
-    
-    // CHoCH Bearish: preço quebra low anterior em uptrend
-    if (trend === 'bullish' && lows.length >= 2) {
-      const lastLow = lows[lows.length - 1].price;
-      if (currentPrice < lastLow) {
-        choch = true;
-        trend = 'bearish'; // Mudança de caráter
-      }
-    }
-    
-    // CHoCH Bullish: preço quebra high anterior em downtrend
-    if (trend === 'bearish' && highs.length >= 2) {
-      const lastHigh = highs[highs.length - 1].price;
-      if (currentPrice > lastHigh) {
-        choch = true;
-        trend = 'bullish'; // Mudança de caráter
-      }
-    }
-  }
-  
-  // 🆕 FASE 3: BOS (Break of Structure) REAL
-  // BOS = confirmação de tendência (quebra de high/low principal)
-  if (highs.length >= 2 && lows.length >= 2) {
-    const currentPrice = candles[len - 1].close;
-    const maxHigh = Math.max(...highs.map(h => h.price));
-    const minLow = Math.min(...lows.map(l => l.price));
-    
-    // BOS Bullish: quebra high mais alto
-    if (trend === 'bullish' && currentPrice > maxHigh * 1.001) { // 0.1% margem
-      bos = true;
-    }
-    
-    // BOS Bearish: quebra low mais baixo
-    if (trend === 'bearish' && currentPrice < minLow * 0.999) { // 0.1% margem
-      bos = true;
-    }
-  }
-  
-  const allHighs = highs.map(h => h.price);
-  const allLows = lows.map(l => l.price);
-  
-  return { 
-    trend, 
-    structure, 
-    choch, 
-    bos, 
-    swings: recent, 
-    lastHigh: allHighs.length > 0 ? Math.max(...allHighs) : 0, 
-    lastLow: allLows.length > 0 ? Math.min(...allLows) : 0 
-  };
-}
-
-function calculateFibonacci(candles, marketStructure) {
-  if (!marketStructure || !marketStructure.trend) return null;
-  
-  const { trend, lastHigh, lastLow } = marketStructure;
-  const diff = lastHigh - lastLow;
-  
-  if (diff / lastLow < 0.01) return null;
-  
-  let fib = {};
-  
-  if (trend === 'bullish') {
-    fib = {
-      level_0: lastHigh, level_236: lastHigh - (diff * 0.236), level_382: lastHigh - (diff * 0.382),
-      level_500: lastHigh - (diff * 0.500), level_618: lastHigh - (diff * 0.618), level_786: lastHigh - (diff * 0.786),
-      ext_1272: lastHigh + (diff * 0.272), ext_1414: lastHigh + (diff * 0.414), ext_1618: lastHigh + (diff * 0.618)
-    };
-  } else {
-    fib = {
-      level_0: lastLow, level_236: lastLow + (diff * 0.236), level_382: lastLow + (diff * 0.382),
-      level_500: lastLow + (diff * 0.500), level_618: lastLow + (diff * 0.618), level_786: lastLow + (diff * 0.786),
-      ext_1272: lastLow - (diff * 0.272), ext_1414: lastLow - (diff * 0.414), ext_1618: lastLow - (diff * 0.618)
-    };
-  }
-  
-  return fib;
-}
-
-// 🆕 FASE 3: ORDER BLOCKS REAIS
-function detectOrderBlock(candles) {
-  const last20 = candles.slice(-20);
-  let orderBlocks = [];
-  
-  for (let i = 0; i < last20.length - 2; i++) {
-    const current = last20[i];
-    const next = last20[i + 1];
-    const next2 = last20[i + 2];
-    
-    const currentBody = Math.abs(current.close - current.open);
-    const avgBody = last20.reduce((sum, c) => sum + Math.abs(c.close - c.open), 0) / 20;
-    const avgVolume = last20.reduce((sum, c) => sum + c.volume, 0) / 20;
-    
-    // Bullish Order Block: vela bearish forte seguida de movimento alcista
-    if (current.close < current.open && // Vela vermelha
-        currentBody > avgBody * 1.3 &&   // Corpo > 30% média
-        current.volume > avgVolume * 1.2 && // Volume alto
-        next.close > next.open &&        // Próxima verde
-        next2.close > next2.open) {      // Confirmação
-      
-      orderBlocks.push({
-        type: 'bullish',
-        zone: [current.low, current.high],
-        strength: (currentBody / avgBody) * (current.volume / avgVolume),
-        time: current.time,
-        price: (current.low + current.high) / 2
-      });
-    }
-    
-    // Bearish Order Block: vela bullish forte seguida de movimento baixista
-    if (current.close > current.open && // Vela verde
-        currentBody > avgBody * 1.3 &&   // Corpo > 30% média
-        current.volume > avgVolume * 1.2 && // Volume alto
-        next.close < next.open &&        // Próxima vermelha
-        next2.close < next2.open) {      // Confirmação
-      
-      orderBlocks.push({
-        type: 'bearish',
-        zone: [current.low, current.high],
-        strength: (currentBody / avgBody) * (current.volume / avgVolume),
-        time: current.time,
-        price: (current.low + current.high) / 2
-      });
-    }
-  }
-  
-  // Retorna o OB mais forte
-  if (orderBlocks.length === 0) return null;
-  orderBlocks.sort((a, b) => b.strength - a.strength);
-  return orderBlocks[0];
-}
-
-// 🆕 FASE 3: FVG (FAIR VALUE GAP) REAL
-function detectFVG(candles) {
-  const last10 = candles.slice(-10);
-  let fvgs = [];
-  
-  for (let i = 0; i < last10.length - 2; i++) {
-    const first = last10[i];
-    const middle = last10[i + 1];
-    const third = last10[i + 2];
-    
-    const firstRange = first.high - first.low;
-    const avgRange = last10.reduce((sum, c) => sum + (c.high - c.low), 0) / 10;
-    
-    // Bullish FVG: gap pra cima (third.low > first.high)
-    if (third.low > first.high) {
-      const gap = third.low - first.high;
-      const gapPercent = gap / first.close;
-      
-      // Gap deve ser significativo (> 0.1% e > 20% do range médio)
-      if (gapPercent > 0.001 && gap > avgRange * 0.2) {
-        fvgs.push({
-          type: 'bullish',
-          gap,
-          gapPercent,
-          zone: [first.high, third.low],
-          strength: gap / avgRange,
-          time: third.time
-        });
-      }
-    }
-    
-    // Bearish FVG: gap pra baixo (third.high < first.low)
-    if (third.high < first.low) {
-      const gap = first.low - third.high;
-      const gapPercent = gap / first.close;
-      
-      // Gap deve ser significativo
-      if (gapPercent > 0.001 && gap > avgRange * 0.2) {
-        fvgs.push({
-          type: 'bearish',
-          gap,
-          gapPercent,
-          zone: [third.high, first.low],
-          strength: gap / avgRange,
-          time: third.time
-        });
-      }
-    }
-  }
-  
-  // Retorna FVG mais forte e recente
-  if (fvgs.length === 0) return null;
-  fvgs.sort((a, b) => b.strength - a.strength);
-  return fvgs[0];
-}
-
-// 🆕 FASE 3: LIQUIDITY ZONES REAIS
-function detectLiquidity(candles, marketStructure) {
-  if (!marketStructure || !marketStructure.swings) return null;
-  
-  const { swings } = marketStructure;
-  const currentPrice = candles[candles.length - 1].close;
-  const last20 = candles.slice(-20);
-  
-  // Zonas de liquidez = onde stops estão concentrados
-  const highs = swings.filter(s => s.type === 'high');
-  const lows = swings.filter(s => s.type === 'low');
-  
-  // Liquidity acima do preço (resistance)
-  const aboveLiquidity = highs
-    .filter(h => h.price > currentPrice)
-    .map(h => ({
-      price: h.price,
-      type: 'sell_stops',
-      distance: ((h.price - currentPrice) / currentPrice) * 100
-    }))
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, 3);
-  
-  // Liquidity abaixo do preço (support)
-  const belowLiquidity = lows
-    .filter(l => l.price < currentPrice)
-    .map(l => ({
-      price: l.price,
-      type: 'buy_stops',
-      distance: ((currentPrice - l.price) / currentPrice) * 100
-    }))
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, 3);
-  
-  // Verifica se liquidez foi "swept" (capturada)
-  const recentHigh = Math.max(...last20.map(c => c.high));
-  const recentLow = Math.min(...last20.map(c => c.low));
-  
-  let captured = null;
-  
-  if (aboveLiquidity.length > 0 && recentHigh > aboveLiquidity[0].price && currentPrice < aboveLiquidity[0].price) {
-    captured = 'above';
-  }
-  
-  if (belowLiquidity.length > 0 && recentLow < belowLiquidity[0].price && currentPrice > belowLiquidity[0].price) {
-    captured = 'below';
-  }
-  
-  return { 
-    above: aboveLiquidity.map(l => l.price), 
-    below: belowLiquidity.map(l => l.price), 
-    captured 
-  };
-}
-
-function calculateIndicators(candles) {
-  const closes = candles.map(c => c.close);
-  const highs = candles.map(c => c.high);
-  const lows = candles.map(c => c.low);
+function calculateIndicators(data) {
+  const closes = data.map(c => c.close);
+  const highs = data.map(c => c.high);
+  const lows = data.map(c => c.low);
   
   const rsi = RSI.calculate({ values: closes, period: 14 });
-  const macd = MACD.calculate({ values: closes, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 });
-  const ema20 = EMA.calculate({ period: 20, values: closes });
-  const ema50 = EMA.calculate({ period: 50, values: closes });
-  const ema200 = EMA.calculate({ period: 200, values: closes });
-  const atr = ATR.calculate({ high: highs, low: lows, close: closes, period: 14 });
+  const macd = MACD.calculate({
+    values: closes,
+    fastPeriod: 12,
+    slowPeriod: 26,
+    signalPeriod: 9,
+    SimpleMAOscillator: false,
+    SimpleMASignal: false
+  });
   
-  // 🆕 FASE 1: ADX para detectar força de tendência
-  const adx = ADX.calculate({ high: highs, low: lows, close: closes, period: 14 });
+  const ema20 = EMA.calculate({ values: closes, period: 20 });
+  const ema50 = EMA.calculate({ values: closes, period: 50 });
+  const ema200 = EMA.calculate({ values: closes, period: 200 });
+  
+  const atr = ATR.calculate({
+    high: highs,
+    low: lows,
+    close: closes,
+    period: 14
+  });
+  
+  const adx = ADX.calculate({
+    high: highs,
+    low: lows,
+    close: closes,
+    period: 14
+  });
   
   return {
-    rsi: rsi[rsi.length - 1], 
+    rsi: rsi[rsi.length - 1],
     macd: macd[macd.length - 1],
-    ema20: ema20[ema20.length - 1], 
+    ema20: ema20[ema20.length - 1],
     ema50: ema50[ema50.length - 1],
-    ema200: ema200[ema200.length - 1], 
-    atr: atr[atr.length - 1], 
-    adx: adx[adx.length - 1]?.adx || 0,  // 🆕 FASE 1
-    price: closes[closes.length - 1]
+    ema200: ema200[ema200.length - 1],
+    atr: atr[atr.length - 1],
+    adx: adx[adx.length - 1]
   };
 }
 
-// 🆕 FASE 1: Análise de volume melhorada (24h ao invés de 20 velas)
-function analyzeVolume(candles) {
-  const volumes = candles.map(c => c.volume);
-  
-  // Volume médio 24h (96 velas de 15min = 24h)
-  const avgVolume24h = volumes.slice(0, 96).reduce((a, b) => a + b, 0) / 96;
-  const currentVolume = volumes[volumes.length - 1];
-  const ratio = currentVolume / avgVolume24h;
-  
-  // Volume Spike (> 2x média)
-  const spike = ratio > 2.0;
-  
-  // Volume crescente (últimas 3 velas)
-  const last3Vol = volumes.slice(-3);
-  const increasing = last3Vol[2] > last3Vol[1] && last3Vol[1] > last3Vol[0];
-  
-  return { 
-    current: currentVolume, 
-    average: avgVolume24h, 
-    ratio, 
-    spike, 
-    increasing 
-  };
-}
+// ============================================
+// SMART MONEY CONCEPTS - DADOS REAIS
+// ============================================
 
-function detectSR(candles) {
-  const currentPrice = candles[candles.length - 1].close;
-  const levels = [];
-  const tolerance = currentPrice * 0.002;
+function findSwingPoints(candles, lookback = 5) {
+  const highs = [];
+  const lows = [];
   
-  for (let i = 0; i < candles.length - 20; i++) {
-    const testPrice = candles[i].high;
-    const touches = candles.filter(c => Math.abs(c.high - testPrice) < tolerance || Math.abs(c.low - testPrice) < tolerance).length;
+  for (let i = lookback; i < candles.length - lookback; i++) {
+    let isSwingHigh = true;
+    let isSwingLow = true;
     
-    if (touches >= 3) levels.push({ price: testPrice, touches, type: 'resistance' });
+    for (let j = 1; j <= lookback; j++) {
+      if (candles[i].high <= candles[i - j].high || candles[i].high <= candles[i + j].high) {
+        isSwingHigh = false;
+      }
+      if (candles[i].low >= candles[i - j].low || candles[i].low >= candles[i + j].low) {
+        isSwingLow = false;
+      }
+    }
+    
+    if (isSwingHigh) highs.push({ index: i, price: candles[i].high });
+    if (isSwingLow) lows.push({ index: i, price: candles[i].low });
   }
   
-  const unique = levels.filter((level, index, self) => index === self.findIndex(l => Math.abs(l.price - level.price) < tolerance));
-  const nearest = unique.sort((a, b) => Math.abs(a.price - currentPrice) - Math.abs(b.price - currentPrice))[0];
-  
-  return nearest || null;
+  return { highs, lows };
 }
+
+function detectCHOCH(candles) {
+  const swings = findSwingPoints(candles);
+  const currentPrice = candles[0].close;
+  
+  // Bullish CHOCH: Rompe último swing high
+  if (swings.highs.length > 0) {
+    const lastHigh = swings.highs[0];
+    if (currentPrice > lastHigh.price) {
+      return { detected: true, type: 'bullish', level: lastHigh.price };
+    }
+  }
+  
+  // Bearish CHOCH: Rompe último swing low
+  if (swings.lows.length > 0) {
+    const lastLow = swings.lows[0];
+    if (currentPrice < lastLow.price) {
+      return { detected: true, type: 'bearish', level: lastLow.price };
+    }
+  }
+  
+  return { detected: false };
+}
+
+function detectBOS(candles) {
+  const swings = findSwingPoints(candles);
+  const currentPrice = candles[0].close;
+  
+  // Bullish BOS: Rompe high anterior
+  if (swings.highs.length >= 2) {
+    const prevHigh = swings.highs[1];
+    if (currentPrice > prevHigh.price) {
+      return { detected: true, type: 'bullish', level: prevHigh.price };
+    }
+  }
+  
+  // Bearish BOS: Rompe low anterior
+  if (swings.lows.length >= 2) {
+    const prevLow = swings.lows[1];
+    if (currentPrice < prevLow.price) {
+      return { detected: true, type: 'bearish', level: prevLow.price };
+    }
+  }
+  
+  return { detected: false };
+}
+
+function detectFVG(candles) {
+  // Fair Value Gap: Gap entre 3 velas consecutivas
+  const gaps = [];
+  
+  for (let i = 0; i < candles.length - 3; i++) {
+    const candle1 = candles[i];
+    const candle2 = candles[i + 1];
+    const candle3 = candles[i + 2];
+    
+    // Bullish FVG
+    const bullishGap = candle3.low - candle1.high;
+    if (bullishGap > 0 && bullishGap / candle2.close > 0.005) {
+      gaps.push({ 
+        type: 'bullish', 
+        top: candle3.low, 
+        bottom: candle1.high,
+        size: bullishGap 
+      });
+    }
+    
+    // Bearish FVG
+    const bearishGap = candle1.low - candle3.high;
+    if (bearishGap > 0 && bearishGap / candle2.close > 0.005) {
+      gaps.push({ 
+        type: 'bearish', 
+        top: candle1.low, 
+        bottom: candle3.high,
+        size: bearishGap 
+      });
+    }
+  }
+  
+  return gaps.length > 0 ? gaps[0] : null;
+}
+
+function detectOrderBlock(candles) {
+  // Order Block: Última vela antes de movimento forte
+  for (let i = 1; i < Math.min(20, candles.length - 1); i++) {
+    const moveSize = Math.abs(candles[i - 1].close - candles[0].close);
+    const avgBody = (candles[0].close - candles[0].open);
+    
+    if (moveSize / candles[0].close > 0.02) { // Movimento > 2%
+      return {
+        detected: true,
+        type: candles[i - 1].close > candles[i].close ? 'bullish' : 'bearish',
+        high: candles[i].high,
+        low: candles[i].low
+      };
+    }
+  }
+  
+  return { detected: false };
+}
+
+// ============================================
+// ANÁLISE DE ESTRUTURA
+// ============================================
+
+function analyzeMarketStructure(data) {
+  const swings = findSwingPoints(data);
+  
+  // Bullish Structure: Higher Highs + Higher Lows
+  let bullishStructure = true;
+  for (let i = 0; i < Math.min(3, swings.highs.length - 1); i++) {
+    if (swings.highs[i].price <= swings.highs[i + 1].price) {
+      bullishStructure = false;
+      break;
+    }
+  }
+  
+  // Bearish Structure: Lower Highs + Lower Lows
+  let bearishStructure = true;
+  for (let i = 0; i < Math.min(3, swings.lows.length - 1); i++) {
+    if (swings.lows[i].price >= swings.lows[i + 1].price) {
+      bearishStructure = false;
+      break;
+    }
+  }
+  
+  let trend = 'ranging';
+  if (bullishStructure && !bearishStructure) trend = 'bullish';
+  if (bearishStructure && !bullishStructure) trend = 'bearish';
+  
+  const choch = detectCHOCH(data);
+  const bos = detectBOS(data);
+  
+  return {
+    trend,
+    structure: bullishStructure ? 'HH/HL' : bearishStructure ? 'LH/LL' : 'Ranging',
+    choch: choch.detected,
+    chochType: choch.type,
+    bos: bos.detected,
+    bosType: bos.type
+  };
+}
+
+// ============================================
+// ANÁLISE DE VOLUME MELHORADA
+// ============================================
+
+function analyzeVolume(data) {
+  const volumes = data.slice(0, 96).map(c => c.volume); // 24h
+  const avgVolume = volumes.reduce((a, b) => a + b) / volumes.length;
+  const currentVolume = data[0].volume;
+  const ratio = currentVolume / avgVolume;
+  
+  // Volume Spike
+  const spike = ratio > 2.0;
+  
+  // Volume Crescente (3 velas)
+  const increasing = data[0].volume > data[1].volume && data[1].volume > data[2].volume;
+  
+  return {
+    ratio,
+    spike,
+    increasing,
+    avgVolume,
+    currentVolume
+  };
+}
+
+// ============================================
+// ANÁLISE COMPLETA DE SÍMBOLO
+// ============================================
 
 async function analyzeSymbol(symbol) {
   try {
-    const candles15m = await getCandlesticks(symbol, '15m', 200);
-    const candles1h = await getCandlesticks(symbol, '1h', 200);
-    const candles4h = await getCandlesticks(symbol, '4h', 100);
+    const data15m = await getCandlesticks(symbol, '15m', 200);
+    const data1h = await getCandlesticks(symbol, '1h', 200);
+    const data4h = await getCandlesticks(symbol, '4h', 200);
     
-    if (!candles15m || !candles1h || !candles4h) return { valid: false, reason: 'Sem dados' };
+    if (!data15m || !data1h || !data4h) {
+      return { valid: false, reason: 'Sem dados' };
+    }
     
-    const structure15m = detectMarketStructure(candles15m);
-    const structure1h = detectMarketStructure(candles1h);
-    const structure4h = detectMarketStructure(candles4h);
+    const price = data15m[0].close;
     
-    if (!structure15m || !structure15m.trend) return { valid: false, reason: 'Sem estrutura 15m' };
+    // Indicadores
+    const ind15m = calculateIndicators(data15m);
+    const ind1h = calculateIndicators(data1h);
+    const ind4h = calculateIndicators(data4h);
     
-    const ind15m = calculateIndicators(candles15m);
-    const ind1h = calculateIndicators(candles1h);
-    const ind4h = calculateIndicators(candles4h);
-    
-    // 🆕 FASE 1: FILTRO ADX - Rejeita mercados laterais
+    // FILTRO ADX - CRÍTICO
     if (ind15m.adx < CONFIG.minADX) {
       return { 
         valid: false, 
-        reason: `Mercado lateral (ADX: ${ind15m.adx.toFixed(1)} < ${CONFIG.minADX})` 
+        reason: `Mercado lateral (ADX: ${ind15m.adx.toFixed(1)})` 
       };
     }
     
-    const volume = analyzeVolume(candles15m);
+    // Estrutura de mercado
+    const structure15m = analyzeMarketStructure(data15m);
+    const structure1h = analyzeMarketStructure(data1h);
+    const structure4h = analyzeMarketStructure(data4h);
     
-    // 🆕 FASE 1: FILTRO VOLUME - Rejeita volume baixo
+    // Volume
+    const volume = analyzeVolume(data15m);
+    
+    // FILTRO VOLUME - CRÍTICO
     if (volume.ratio < CONFIG.volumeMultiplier) {
       return { 
         valid: false, 
-        reason: `Volume baixo (${volume.ratio.toFixed(2)}x < ${CONFIG.volumeMultiplier}x)` 
+        reason: `Volume baixo (${volume.ratio.toFixed(2)}x)` 
       };
     }
     
-    const fib = calculateFibonacci(candles15m, structure15m);
-    if (!fib) return { valid: false, reason: 'Fibonacci inválido' };
+    // SMC Detections
+    const fvg = detectFVG(data15m);
+    const orderBlock = detectOrderBlock(data15m);
     
-    const ob = detectOrderBlock(candles15m);
-    const fvg = detectFVG(candles15m);
-    const liq = detectLiquidity(candles15m, structure15m);
-    const sr = detectSR(candles15m);
+    // ============================================
+    // SCORE CALCULATION
+    // ============================================
     
-    const confluences = [];
     let score = 0;
+    const confluences = [];
     
-    if (structure15m.choch) { confluences.push(`CHOCH ${structure15m.trend}`); score += CONFIG.scoreWeights.choch; }
-    if (structure15m.bos) { confluences.push(`BOS ${structure15m.trend}`); score += CONFIG.scoreWeights.bos; }
-    
-    const price = ind15m.price;
-    const fibDistance618 = Math.abs(price - fib.level_618) / price;
-    const fibDistance786 = Math.abs(price - fib.level_786) / price;
-    
-    if (fibDistance618 < 0.003 || fibDistance786 < 0.003) {
-      confluences.push('Fibonacci 0.618/0.786');
-      score += CONFIG.scoreWeights.fibonacci;
+    // CHOCH (20 pontos)
+    if (structure15m.choch) {
+      if (structure15m.chochType === 'bullish') {
+        score += 20;
+        confluences.push('CHOCH bullish');
+      } else {
+        score += 20;
+        confluences.push('CHOCH bearish');
+      }
     }
     
-    if (ob && ob.type === structure15m.trend) { confluences.push(`Order Block ${ob.type}`); score += CONFIG.scoreWeights.orderBlock; }
-    if (fvg && fvg.type === structure15m.trend) { confluences.push(`FVG ${fvg.type}`); score += CONFIG.scoreWeights.fvg; }
-    if (liq && liq.captured) { confluences.push(`Liquidez ${liq.captured}`); score += CONFIG.scoreWeights.liquidity; }
-    
-    const emaTrend15m = ind15m.price > ind15m.ema20 && ind15m.ema20 > ind15m.ema50;
-    const emaTrend1h = ind1h.price > ind1h.ema20 && ind1h.ema20 > ind1h.ema50;
-    
-    if (structure15m.trend === 'bullish' && emaTrend15m && emaTrend1h) {
-      confluences.push('EMA Uptrend Multi-TF');
-      score += CONFIG.scoreWeights.emaTrend;
-    }
-    if (structure15m.trend === 'bearish' && !emaTrend15m && !emaTrend1h) {
-      confluences.push('EMA Downtrend Multi-TF');
-      score += CONFIG.scoreWeights.emaTrend;
+    // BOS (20 pontos)
+    if (structure15m.bos) {
+      if (structure15m.bosType === 'bullish') {
+        score += 20;
+        confluences.push('BOS bullish');
+      } else {
+        score += 20;
+        confluences.push('BOS bearish');
+      }
     }
     
+    // FVG (15 pontos)
+    if (fvg) {
+      score += 15;
+      confluences.push(`FVG ${fvg.type}`);
+    }
+    
+    // Order Block (15 pontos)
+    if (orderBlock.detected) {
+      score += 15;
+      confluences.push(`Order Block ${orderBlock.type}`);
+    }
+    
+    // EMA Trend Multi-TF (20 pontos)
+    const emaTrend15m = price > ind15m.ema20 && ind15m.ema20 > ind15m.ema50;
+    const emaTrend1h = data1h[0].close > ind1h.ema20;
+    
+    if ((structure15m.trend === 'bullish' && emaTrend15m && emaTrend1h) ||
+        (structure15m.trend === 'bearish' && !emaTrend15m && !emaTrend1h)) {
+      score += 20;
+      confluences.push('EMA Trend Multi-TF');
+    }
+    
+    // MACD (10 pontos)
     if (ind15m.macd && ind15m.macd.MACD > ind15m.macd.signal && structure15m.trend === 'bullish') {
+      score += 10;
       confluences.push('MACD Bullish');
-      score += CONFIG.scoreWeights.macd;
-    }
-    if (ind15m.macd && ind15m.macd.MACD < ind15m.macd.signal && structure15m.trend === 'bearish') {
+    } else if (ind15m.macd && ind15m.macd.MACD < ind15m.macd.signal && structure15m.trend === 'bearish') {
+      score += 10;
       confluences.push('MACD Bearish');
-      score += CONFIG.scoreWeights.macd;
     }
     
-    if (ind15m.rsi < 40 && structure15m.trend === 'bullish') { confluences.push('RSI Oversold'); score += CONFIG.scoreWeights.rsi; }
-    if (ind15m.rsi > 60 && structure15m.trend === 'bearish') { confluences.push('RSI Overbought'); score += CONFIG.scoreWeights.rsi; }
-    
-    if (sr) { confluences.push('S/R'); score += CONFIG.scoreWeights.sr; }
-    
-    if (volume.spike && volume.increasing) { 
-      confluences.push('Volume Spike'); 
-      score += CONFIG.scoreWeights.volumeSpike; 
+    // RSI (10 pontos)
+    if (ind15m.rsi < 40 && structure15m.trend === 'bullish') {
+      score += 10;
+      confluences.push('RSI Oversold');
+    } else if (ind15m.rsi > 60 && structure15m.trend === 'bearish') {
+      score += 10;
+      confluences.push('RSI Overbought');
     }
     
-    // 🆕 FASE 1: BONUS ADX Forte (> 30)
+    // Volume Spike (15 pontos)
+    if (volume.spike && volume.increasing) {
+      score += 15;
+      confluences.push('Volume Spike Forte');
+    } else if (volume.ratio > CONFIG.volumeMultiplier) {
+      score += 10;
+      confluences.push('Volume Alto');
+    }
+    
+    // ADX Strength Bonus (10 pontos)
     if (ind15m.adx > 30) {
+      score += 10;
       confluences.push(`ADX Forte (${ind15m.adx.toFixed(0)})`);
-      score += CONFIG.scoreWeights.adxBonus;
     }
     
-    // 🆕 FASE 1: BONUS Volume Spike Extremo (> 2.5x)
-    if (volume.ratio > 2.5) {
-      confluences.push(`Volume Extremo (${volume.ratio.toFixed(1)}x)`);
-      score += 5;
-    }
-    
-    // 🆕 FASE 2: SESSION SCORE (Horários Premium)
+    // Session Score
     const sessionScore = getSessionScore();
     score += sessionScore;
     if (sessionScore > 0) {
       confluences.push('Horário Premium');
-    } else if (sessionScore < 0) {
-      // Dead zone - penaliza mas não rejeita (pode ter setup excepcional)
-      confluences.push('Horário Fraco');
     }
     
+    // Trend Alignment Bonus (20 pontos)
     const trendAlignment = (structure15m.trend === structure1h.trend && structure1h.trend === structure4h.trend);
-    
     if (trendAlignment) {
+      score += 20;
       confluences.push(`Tendência ${structure15m.trend} alinhada 15m/1h/4h`);
-      score += CONFIG.scoreWeights.trendAlignment;
-    } else {
-      return { valid: false, reason: `Tendências desalinhadas (15m:${structure15m.trend} 1h:${structure1h.trend} 4h:${structure4h.trend})` };
     }
     
-    if (score < CONFIG.minScore) return { valid: false, reason: `Score baixo: ${score}/${CONFIG.minScore}` };
+    // ============================================
+    // FILTROS FINAIS
+    // ============================================
     
-    // 🆕 FASE 2: Verifica direção antes dos filtros finais
-    const direction = structure15m.trend === 'bullish' ? 'LONG' : 'SHORT';
+    if (score < CONFIG.minScore) {
+      return { valid: false, reason: `Score baixo: ${score}/${CONFIG.minScore}` };
+    }
     
-    // 🆕 FASE 2: FILTRO DE CORRELAÇÃO
+    if (confluences.length < 3) {
+      return { valid: false, reason: `Poucas confluências: ${confluences.length}` };
+    }
+    
+    // Verifica correlação
+    const direction = structure15m.trend === 'bullish' ? 'LONG' : structure15m.trend === 'bearish' ? 'SHORT' : null;
+    if (!direction) {
+      return { valid: false, reason: 'Sem direção clara' };
+    }
+    
     if (hasActiveTradeInGroup(symbol, direction)) {
-      return { 
-        valid: false, 
-        reason: `Grupo ${findCorrelationGroup(symbol)} já tem trade ${direction}` 
-      };
+      return { valid: false, reason: 'Grupo já tem trade ativo' };
     }
     
+    // Verifica sinais recentes
     const recentSignals = state.signals.slice(0, 20);
     const recentSame = recentSignals.find(s => s.symbol === symbol);
     if (recentSame) {
       const timeSince = Date.now() - new Date(recentSame.timestamp).getTime();
       const hoursSince = timeSince / (1000 * 60 * 60);
-      
-      if (hoursSince < 6) return { valid: false, reason: `Sinal recente (${hoursSince.toFixed(1)}h)` };
+      if (hoursSince < 6) {
+        return { valid: false, reason: `Sinal recente (${hoursSince.toFixed(1)}h)` };
+      }
     }
     
-    const entry = price;
+    // ============================================
+    // CALCULA ENTRADA E SAÍDAS
+    // ============================================
     
+    const entry = price;
     const atrValue = ind15m.atr;
     const atrStop = atrValue * CONFIG.atrMultiplier;
     
@@ -980,38 +673,64 @@ async function analyzeSymbol(symbol) {
     
     if (direction === 'LONG') {
       stop = entry - atrStop;
-      tp1 = fib.ext_1272;
-      tp2 = fib.ext_1414;
-      tp3 = fib.ext_1618;
+      
+      // Fibonacci Extensions
+      const fibBase = entry - stop;
+      tp1 = entry + (fibBase * 1.272);
+      tp2 = entry + (fibBase * 1.618);
+      tp3 = entry + (fibBase * 2.0);
     } else {
       stop = entry + atrStop;
-      tp1 = fib.ext_1272;
-      tp2 = fib.ext_1414;
-      tp3 = fib.ext_1618;
+      
+      const fibBase = stop - entry;
+      tp1 = entry - (fibBase * 1.272);
+      tp2 = entry - (fibBase * 1.618);
+      tp3 = entry - (fibBase * 2.0);
     }
     
     const rr = Math.abs(tp3 - entry) / Math.abs(entry - stop);
     
-    if (Math.abs(entry - stop) / entry < 0.005) return { valid: false, reason: 'Stop muito próximo' };
-    if (rr < 1.5) return { valid: false, reason: `R:R baixo: ${rr.toFixed(2)}` };
-    if (direction === 'LONG' && tp3 <= entry) return { valid: false, reason: 'TP3 inválido LONG' };
-    if (direction === 'SHORT' && tp3 >= entry) return { valid: false, reason: 'TP3 inválido SHORT' };
+    if (Math.abs(entry - stop) / entry < 0.003) {
+      return { valid: false, reason: 'Stop muito próximo' };
+    }
     
-    const confidenceLevel = score >= CONFIG.highConfidence ? 'ALTA' : 'MEDIA';
+    if (rr < 1.5) {
+      return { valid: false, reason: `R:R baixo: ${rr.toFixed(2)}` };
+    }
+    
+    if (direction === 'LONG' && tp3 <= entry) {
+      return { valid: false, reason: 'TP3 inválido LONG' };
+    }
+    
+    if (direction === 'SHORT' && tp3 >= entry) {
+      return { valid: false, reason: 'TP3 inválido SHORT' };
+    }
+    
+    const confidenceLevel = score >= CONFIG.highConfidence ? 'ALTA' : score >= CONFIG.minScore + 10 ? 'MEDIA' : 'BAIXA';
     
     return {
-      valid: true, symbol, direction,
-      entry: formatPrice(entry), stopLoss: formatPrice(stop),
-      tp1: formatPrice(tp1), tp2: formatPrice(tp2), tp3: formatPrice(tp3),
-      rr: rr.toFixed(2), confluences: confluences.join(' + '),
-      confidenceLevel, score, structure: structure15m.structure,
-      choch: structure15m.choch, bos: structure15m.bos,
-      volumeRatio: volume.ratio.toFixed(2), atr: formatPrice(atrValue),
-      adx: ind15m.adx.toFixed(1),  // 🆕 FASE 1: ADX
+      valid: true,
+      symbol,
+      direction,
+      entry: formatPrice(entry),
+      stopLoss: formatPrice(stop),
+      tp1: formatPrice(tp1),
+      tp2: formatPrice(tp2),
+      tp3: formatPrice(tp3),
+      rr: rr.toFixed(2),
+      confluences: confluences.join(' + '),
+      confidenceLevel,
+      score,
+      structure: structure15m.structure,
+      choch: structure15m.choch,
+      bos: structure15m.bos,
+      volumeRatio: volume.ratio.toFixed(2),
+      atr: formatPrice(atrValue),
+      adx: ind15m.adx.toFixed(1),
       timestamp: new Date().toISOString(),
-      reachedTP1: false,  // 🆕 FASE 1: Para trailing stop
-      reachedTP2: false,  // 🆕 FASE 1: Para trailing stop
-      trailingActive: false  // 🆕 FASE 1: Status trailing
+      reachedTP1: false,
+      reachedTP2: false,
+      trailingActive: false
     };
     
   } catch (error) {
@@ -1019,190 +738,9 @@ async function analyzeSymbol(symbol) {
   }
 }
 
-async function analyzeMarket() {
-  try {
-    state.analysisCount++;
-    
-    // 🆕 FASE 2: Log com modo de risco
-    const currentRisk = calculateDynamicRisk();
-    addLog(`=== Análise #${state.analysisCount} | Modo: ${state.riskMode.toUpperCase()} | Risco: ${(currentRisk * 100).toFixed(1)}% ===`, 'info');
-    
-    // 🆕 FASE 2: Verifica se pode abrir novos trades
-    if (!canTakeNewTrade()) {
-      addLog('Não pode abrir novos trades agora', 'warning');
-      return;
-    }
-    
-    const results = [];
-    
-    for (const symbol of CONFIG.pairs) {
-      const result = await analyzeSymbol(symbol);
-      
-      if (result.valid) {
-        results.push(result);
-        addLog(`${symbol}: SETUP! Score ${result.score}`, 'success');
-      } else {
-        addLog(`${symbol}: ${result.reason}`, 'warning');
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    
-    results.sort((a, b) => b.score - a.score);
-    const topSignals = results.slice(0, 1);
-    
-    if (topSignals.length > 0) {
-      const signal = topSignals[0];
-      state.signals.unshift(signal);
-      state.signals = state.signals.slice(0, 20);
-      
-      // Calcula zona de entrada (±0.3%)
-      const entryPrice = parseFloat(signal.entry);
-      const zoneMin = formatPrice(entryPrice * 0.997);
-      const zoneMax = formatPrice(entryPrice * 1.003);
-      
-      // Calcula percentuais
-      const stopPrice = parseFloat(signal.stopLoss);
-      const tp1Price = parseFloat(signal.tp1);
-      const tp2Price = parseFloat(signal.tp2);
-      const tp3Price = parseFloat(signal.tp3);
-      
-      const riskPercent = (((stopPrice - entryPrice) / entryPrice) * 100).toFixed(2);
-      const tp1Percent = (((tp1Price - entryPrice) / entryPrice) * 100).toFixed(1);
-      const tp2Percent = (((tp2Price - entryPrice) / entryPrice) * 100).toFixed(1);
-      const tp3Percent = (((tp3Price - entryPrice) / entryPrice) * 100).toFixed(1);
-      
-      // Barra de força visual
-      const scorePercent = Math.round((signal.score / 100) * 10);
-      const greenBars = '🟩'.repeat(scorePercent);
-      const grayBars = '⬜'.repeat(10 - scorePercent);
-      
-      // Análise de tendência
-      const trendText = signal.direction === 'LONG' ? 'Alta' : 'Baixa';
-      const volumeText = signal.volumeRatio >= 2 ? 'Forte' : signal.volumeRatio >= 1.5 ? 'Médio' : 'Fraco';
-      const forceText = signal.score >= 85 ? 'Forte' : signal.score >= 70 ? 'Média' : 'Fraca';
-      
-      // 🆕 Trunca confluências se muito grande
-      let confluencesText = signal.confluences;
-      if (confluencesText.length > 500) {
-        confluencesText = confluencesText.substring(0, 497) + '...';
-      }
-      
-      const message = `🚨 FUTURES SIGNAL V5.0 | ${signal.symbol}
-
-📈 Direção: ${signal.direction}
-⚡ Alavancagem: ${CONFIG.leverage}x
-🎯 Score: ${signal.score}/100
-📊 ADX: ${signal.adx} (Tendência ${signal.adx > 30 ? 'Forte' : 'Média'})
-
-━━━━━━━━━━━━━━━━━━
-
-📡 Exchange: Binance Futures
-⏱ Timeframe: 15m
-📊 Tipo: Scalping Profissional V5.0
-⏳ Duração Estimada: 2h — 6h
-
-━━━━━━━━━━━━━━━━━━
-
-💰 Entrada: ${signal.entry}
-📍 Zona: ${zoneMin} — ${zoneMax}
-
-🛑 Stop Loss: ${signal.stopLoss}
-⚠️ Risco: ${riskPercent}%
-📏 ATR: ${signal.atr}
-
-━━━━━━━━━━━━━━━━━━
-
-🎯 Take Profits
-
-🥇 TP1: ${signal.tp1} (${tp1Percent > 0 ? '+' : ''}${tp1Percent}%)
-🥈 TP2: ${signal.tp2} (${tp2Percent > 0 ? '+' : ''}${tp2Percent}%)
-🥉 TP3: ${signal.tp3} (${tp3Percent > 0 ? '+' : ''}${tp3Percent}%)
-
-━━━━━━━━━━━━━━━━━━
-
-📊 Risk / Reward
-📉 Risco: ${Math.abs(parseFloat(riskPercent))}%
-📈 Retorno Máx: ${Math.abs(parseFloat(tp3Percent))}%
-⚖️ RR: 1:${signal.rr}
-
-━━━━━━━━━━━━━━━━━━
-
-✨ Proteções FASE 1+2
-
-✅ Breakeven em TP1
-✅ Trailing Stop em TP2
-✅ Fechamento automático TP3
-⚡ ADX Filter Ativo (${signal.adx})
-📊 Volume 24h Confirmado (${signal.volumeRatio}x)
-💰 Risco Dinâmico: ${(calculateDynamicRisk() * 100).toFixed(1)}%
-🎯 Modo: ${state.riskMode.toUpperCase()}
-🔒 Correlação Filtrada
-🕐 Session Filter
-
-━━━━━━━━━━━━━━━━━━
-
-📊 Dados do Trade
-
-📊 Tendência: ${trendText}
-📈 Volume: ${volumeText} (${signal.volumeRatio}x)
-⚡ Força: ${forceText}
-🔥 Volatilidade: Média/Alta
-
-━━━━━━━━━━━━━━━━━━
-
-📊 Força do Sinal
-${greenBars}${grayBars} ${signal.score}%
-
-━━━━━━━━━━━━━━━━━━
-
-✅ Confluências Detectadas:
-${confluencesText}
-
-━━━━━━━━━━━━━━━━━━
-
-📅 Data: ${new Date().toLocaleDateString('pt-BR')}
-🕐 Horário: ${new Date().toLocaleTimeString('pt-BR')} (UTC-3)
-
-━━━━━━━━━━━━━━━━━━
-
-🤖 Bruno Trader Pro V5.0 - SISTEMA COMPLETO
-🚀 Sistema Profissional Completo
-✨ Trailing + ADX + Volume + Risco Dinâmico
-📡 Binance Futures`;
-      
-      // 🆕 FASE 3: Gera e envia gráfico PRIMEIRO
-      try {
-        const chartPath = await generateChartImage(signal, candles15m);
-        if (chartPath) {
-          addLog('📤 Enviando gráfico para Telegram...', 'info');
-          await bot.sendPhoto(CHAT_ID, chartPath, {
-            caption: `📊 Análise Visual - ${signal.symbol} ${signal.direction}\nScore: ${signal.score}/100 | ADX: ${signal.adx}`
-          });
-          addLog('✅ Gráfico enviado!', 'success');
-          
-          // Deleta arquivo temporário
-          fs.unlinkSync(chartPath);
-        }
-      } catch (chartError) {
-        addLog(`⚠️ Erro no gráfico (continua sem ele): ${chartError.message}`, 'warning');
-      }
-      
-      // Envia mensagem de texto
-      await sendTelegram(message);
-      state.pendingTrades.push(signal);
-      
-      addLog(`SINAL: ${signal.symbol} ${signal.direction} (${signal.score}/100)`, 'success');
-    } else {
-      addLog('Nenhum setup de alta qualidade encontrado', 'info');
-    }
-    
-    state.lastAnalysis = new Date();
-    
-  } catch (error) {
-    addLog(`Erro: ${error.message}`, 'error');
-  }
-}
+// ============================================
+// TRAILING STOP + BREAKEVEN
+// ============================================
 
 async function checkTradeResults() {
   if (state.pendingTrades.length === 0) return;
@@ -1226,7 +764,7 @@ async function checkTradeResults() {
     const atr = parseFloat(trade.atr);
     
     // ============================================
-    // 🆕 FASE 1: TRAILING STOP LOGIC
+    // TRAILING STOP LOGIC
     // ============================================
     
     if (trade.direction === 'LONG') {
@@ -1235,22 +773,21 @@ async function checkTradeResults() {
         trade.stopLoss = formatPrice(entry);
         trade.reachedTP1 = true;
         addLog(`${trade.symbol}: TP1 atingido! Stop → Breakeven`, 'success');
-        await sendTelegram(`🟢 ${trade.symbol} LONG\n\nTP1 atingido!\nStop movido para breakeven: $${formatPrice(entry)}\n\n✅ Capital protegido!`);
+        await sendTelegram(`🟢 ${trade.symbol} LONG\n\nTP1 atingido!\nStop movido para breakeven: $${formatPrice(entry)}`);
       }
       
       // TP2 batido: Ativa trailing stop
       if (currentPrice >= tp2 && trade.reachedTP1 && !trade.trailingActive) {
         trade.trailingActive = true;
         addLog(`${trade.symbol}: TP2 atingido! Trailing stop ativo`, 'success');
-        await sendTelegram(`🟢 ${trade.symbol} LONG\n\nTP2 atingido!\nTrailing Stop ATIVO!\n\n⚡ Seguindo o movimento...`);
       }
       
-      // Trailing stop ativo: Ajusta stop
+      // Trailing stop ativo
       if (trade.trailingActive) {
         const trailingStop = currentPrice - (atr * CONFIG.trailing.trailingATR);
         if (trailingStop > parseFloat(trade.stopLoss)) {
           trade.stopLoss = formatPrice(trailingStop);
-          addLog(`${trade.symbol}: Trailing → $${formatPrice(trailingStop)}`, 'info');
+          addLog(`${trade.symbol}: Trailing stop → $${formatPrice(trailingStop)}`, 'info');
         }
         stop = parseFloat(trade.stopLoss);
       }
@@ -1299,20 +836,19 @@ async function checkTradeResults() {
         trade.stopLoss = formatPrice(entry);
         trade.reachedTP1 = true;
         addLog(`${trade.symbol}: TP1 atingido! Stop → Breakeven`, 'success');
-        await sendTelegram(`🟢 ${trade.symbol} SHORT\n\nTP1 atingido!\nStop movido para breakeven: $${formatPrice(entry)}\n\n✅ Capital protegido!`);
+        await sendTelegram(`🟢 ${trade.symbol} SHORT\n\nTP1 atingido!\nStop movido para breakeven: $${formatPrice(entry)}`);
       }
       
       if (currentPrice <= tp2 && trade.reachedTP1 && !trade.trailingActive) {
         trade.trailingActive = true;
         addLog(`${trade.symbol}: TP2 atingido! Trailing stop ativo`, 'success');
-        await sendTelegram(`🟢 ${trade.symbol} SHORT\n\nTP2 atingido!\nTrailing Stop ATIVO!\n\n⚡ Seguindo o movimento...`);
       }
       
       if (trade.trailingActive) {
         const trailingStop = currentPrice + (atr * CONFIG.trailing.trailingATR);
         if (trailingStop < parseFloat(trade.stopLoss)) {
           trade.stopLoss = formatPrice(trailingStop);
-          addLog(`${trade.symbol}: Trailing → $${formatPrice(trailingStop)}`, 'info');
+          addLog(`${trade.symbol}: Trailing stop → $${formatPrice(trailingStop)}`, 'info');
         }
         stop = parseFloat(trade.stopLoss);
       }
@@ -1360,30 +896,27 @@ async function checkTradeResults() {
 async function closeTradeWithResult(trade, index, result) {
   const completed = { ...trade, ...result, closedAt: new Date().toISOString() };
   
-  // 🆕 FASE 2: Usa risco dinâmico ao invés de fixo
-  const currentRisk = calculateDynamicRisk();
-  
   state.stats.totalTrades++;
   
   if (result.outcome === 'WIN') {
     state.stats.wins++;
-    state.stats.consecutiveWins++;       // 🆕 FASE 2
-    state.stats.consecutiveLosses = 0;   // 🆕 FASE 2
+    state.stats.consecutiveWins++;
+    state.stats.consecutiveLosses = 0;
     
-    const profitValue = (state.balance * currentRisk) * (result.profit / 100) * CONFIG.leverage;
+    const profitValue = (state.balance * calculateDynamicRisk()) * (result.profit / 100) * CONFIG.leverage;
     state.stats.totalProfit += profitValue;
     state.balance += profitValue;
   } else {
     state.stats.losses++;
-    state.stats.consecutiveLosses++;     // 🆕 FASE 2
-    state.stats.consecutiveWins = 0;     // 🆕 FASE 2
+    state.stats.consecutiveLosses++;
+    state.stats.consecutiveWins = 0;
     
-    const lossValue = state.balance * currentRisk;
+    const lossValue = state.balance * calculateDynamicRisk();
     state.stats.totalProfit -= lossValue;
     state.balance -= lossValue;
   }
   
-  // 🆕 FASE 2: Atualiza drawdown máximo
+  // Atualiza drawdown
   const currentDrawdown = (CONFIG.initialBalance - state.balance) / CONFIG.initialBalance;
   if (currentDrawdown > state.stats.maxDrawdown) {
     state.stats.maxDrawdown = currentDrawdown;
@@ -1411,7 +944,6 @@ async function closeTradeWithResult(trade, index, result) {
 ${result.outcome === 'WIN' ? '✅' : '❌'} Profit: ${profitSign}${result.profit.toFixed(2)}%
 ⏱ Duração: ${result.duration}
 📊 Score: ${trade.score}/100
-📈 ADX: ${trade.adx}
 
 ━━━━━━━━━━━━━━━━━━
 
@@ -1424,13 +956,8 @@ ${result.outcome === 'WIN' ? '✅' : '❌'} Profit: ${profitSign}${result.profit
 📈 Win Rate: ${state.stats.winRate}%
 📉 Drawdown Máx: ${(state.stats.maxDrawdown * 100).toFixed(1)}%
 
-━━━━━━━━━━━━━━━━━━
-
-🆕 FASE 2 - Risco Dinâmico:
-
 🎯 Modo: ${state.riskMode.toUpperCase()}
 💵 Risco Atual: ${(calculateDynamicRisk() * 100).toFixed(1)}%
-🔥 Consecutivos: ${result.outcome === 'WIN' ? state.stats.consecutiveWins + ' wins' : state.stats.consecutiveLosses + ' losses'}
 
 ━━━━━━━━━━━━━━━━━━
 
@@ -1439,14 +966,174 @@ ${result.outcome === 'WIN' ? '✅' : '❌'} Profit: ${profitSign}${result.profit
 
 ━━━━━━━━━━━━━━━━━━
 
-🤖 Bruno Trader Pro V5.0 - SISTEMA COMPLETO
-✨ Trailing Stop + ADX + Volume
-💰 Risco Dinâmico + Correlação
-🕐 Session Filters`;
+🤖 Bruno Trader Pro V5.0`;
   
   await sendTelegram(msg);
   addLog(`${emoji} ${trade.symbol}: ${result.outcome} (${profitSign}${result.profit.toFixed(2)}%)`, result.outcome === 'WIN' ? 'success' : 'error');
 }
+
+// ============================================
+// ANÁLISE DE MERCADO
+// ============================================
+
+async function analyzeMarket() {
+  try {
+    state.analysisCount++;
+    state.lastAnalysis = new Date().toISOString();
+    addLog(`=== Análise #${state.analysisCount} (${CONFIG.pairs.length} pares) | Modo: ${state.riskMode.toUpperCase()} ===`, 'info');
+    
+    // Verifica se pode abrir novos trades
+    if (!canTakeNewTrade()) {
+      addLog('Não pode abrir novos trades agora', 'warning');
+      return;
+    }
+    
+    const results = [];
+    
+    for (const symbol of CONFIG.pairs) {
+      const result = await analyzeSymbol(symbol);
+      
+      if (result.valid) {
+        results.push(result);
+        addLog(`${symbol}: SETUP! Score ${result.score}/100 ADX ${result.adx}`, 'success');
+      } else {
+        addLog(`${symbol}: ${result.reason}`, 'info');
+      }
+    }
+    
+    // Ordena por score
+    results.sort((a, b) => b.score - a.score);
+    
+    const topSignals = results.slice(0, 3);
+    
+    if (topSignals.length > 0) {
+      const signal = topSignals[0];
+      state.signals.unshift(signal);
+      state.signals = state.signals.slice(0, 20);
+      
+      // Calcula zona de entrada
+      const entryPrice = parseFloat(signal.entry);
+      const zoneMin = formatPrice(entryPrice * 0.997);
+      const zoneMax = formatPrice(entryPrice * 1.003);
+      
+      // Calcula percentuais
+      const stopPrice = parseFloat(signal.stopLoss);
+      const tp1Price = parseFloat(signal.tp1);
+      const tp2Price = parseFloat(signal.tp2);
+      const tp3Price = parseFloat(signal.tp3);
+      
+      const riskPercent = (((stopPrice - entryPrice) / entryPrice) * 100).toFixed(2);
+      const tp1Percent = (((tp1Price - entryPrice) / entryPrice) * 100).toFixed(1);
+      const tp2Percent = (((tp2Price - entryPrice) / entryPrice) * 100).toFixed(1);
+      const tp3Percent = (((tp3Price - entryPrice) / entryPrice) * 100).toFixed(1);
+      
+      // Barra de força
+      const scorePercent = Math.round((signal.score / 100) * 10);
+      const greenBars = '🟩'.repeat(scorePercent);
+      const grayBars = '⬜'.repeat(10 - scorePercent);
+      
+      const trendText = signal.direction === 'LONG' ? 'Alta' : 'Baixa';
+      const volumeText = signal.volumeRatio >= 2 ? 'Forte' : signal.volumeRatio >= 1.5 ? 'Médio' : 'Fraco';
+      const forceText = signal.score >= 85 ? 'Forte' : signal.score >= 70 ? 'Média' : 'Fraca';
+      
+      const message = `🚨 FUTURES SIGNAL V5.0 | ${signal.symbol}
+
+📈 Direção: ${signal.direction}
+⚡ Alavancagem: ${CONFIG.leverage}x
+🎯 Score: ${signal.score}/100
+📊 ADX: ${signal.adx} (Tendência ${signal.adx > 30 ? 'Forte' : 'Média'})
+
+━━━━━━━━━━━━━━━━━━
+
+📡 Exchange: Binance Futures
+⏱ Timeframe: 15m
+📊 Tipo: Scalping Profissional V5.0
+⏳ Duração Estimada: 2h — 6h
+
+━━━━━━━━━━━━━━━━━━
+
+💰 Entrada: ${signal.entry}
+📍 Zona: ${zoneMin} — ${zoneMax}
+
+🛑 Stop Loss: ${signal.stopLoss}
+⚠️ Risco: ${riskPercent}%
+📏 ATR: ${signal.atr}
+
+━━━━━━━━━━━━━━━━━━
+
+🎯 Take Profits
+
+🥇 TP1: ${signal.tp1} (${tp1Percent > 0 ? '+' : ''}${tp1Percent}%)
+🥈 TP2: ${signal.tp2} (${tp2Percent > 0 ? '+' : ''}${tp2Percent}%)
+🥉 TP3: ${signal.tp3} (${tp3Percent > 0 ? '+' : ''}${tp3Percent}%)
+
+━━━━━━━━━━━━━━━━━━
+
+📊 Risk / Reward
+📉 Risco: ${Math.abs(parseFloat(riskPercent))}%
+📈 Retorno Máx: ${Math.abs(parseFloat(tp3Percent))}%
+⚖️ RR: 1:${signal.rr}
+
+━━━━━━━━━━━━━━━━━━
+
+✨ Proteções V5.0
+
+✅ Breakeven em TP1
+✅ Trailing Stop em TP2
+✅ Fechamento automático TP3
+⚡ ADX Filter Ativo
+🎯 Correlação Filtrada
+💰 Risco Dinâmico: ${(calculateDynamicRisk() * 100).toFixed(1)}%
+🔥 Modo: ${state.riskMode.toUpperCase()}
+
+━━━━━━━━━━━━━━━━━━
+
+📊 Dados do Trade
+
+📊 Tendência: ${trendText}
+📈 Volume: ${volumeText} (${signal.volumeRatio}x)
+⚡ Força: ${forceText}
+🔥 Estrutura: ${signal.structure}
+
+━━━━━━━━━━━━━━━━━━
+
+📊 Força do Sinal
+${greenBars}${grayBars} ${signal.score}%
+
+━━━━━━━━━━━━━━━━━━
+
+✅ Confluências Detectadas:
+${signal.confluences}
+
+━━━━━━━━━━━━━━━━━━
+
+📅 Data: ${new Date().toLocaleDateString('pt-BR')}
+🕐 Horário: ${new Date().toLocaleTimeString('pt-BR')} (UTC-3)
+
+━━━━━━━━━━━━━━━━━━
+
+🤖 Bruno Trader Pro V5.0
+🚀 Sistema Profissional Completo
+📊 Dados Reais + Trailing Stop
+⚡ ADX Filter + Risco Dinâmico
+📡 Binance Futures`;
+      
+      await sendTelegram(message);
+      state.pendingTrades.push(signal);
+      
+      addLog(`SINAL: ${signal.symbol} ${signal.direction} (${signal.score}/100) ADX: ${signal.adx}`, 'success');
+    } else {
+      addLog('Nenhum setup de alta qualidade encontrado', 'info');
+    }
+    
+  } catch (error) {
+    addLog(`Erro na análise: ${error.message}`, 'error');
+  }
+}
+
+// ============================================
+// API REST
+// ============================================
 
 const app = express();
 app.use(express.json());
@@ -1454,130 +1141,144 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/status', (req, res) => {
   res.json({
-    status: 'online', version: '4.0.0 - Professional', uptime: process.uptime(),
-    analysisCount: state.analysisCount, signalsCount: state.signals.length,
-    pendingTrades: state.pendingTrades.length, lastAnalysis: state.lastAnalysis,
+    status: 'online',
+    version: '5.0.0 - Professional Complete',
+    uptime: process.uptime(),
+    analysisCount: state.analysisCount,
+    signalsCount: state.signals.length,
+    pendingTrades: state.pendingTrades.length,
+    lastAnalysis: state.lastAnalysis,
     stats: state.stats,
+    riskMode: state.riskMode,
+    currentRisk: calculateDynamicRisk(),
     config: {
-      style: 'Scalp Profissional Multi-TF', timeframes: '15m + 1h + 4h',
-      minScore: CONFIG.minScore, pairs: CONFIG.pairs.length,
-      atrStop: 'ATR × ' + CONFIG.atrMultiplier
+      style: 'Scalp Profissional V5.0',
+      features: [
+        'Trailing Stop Inteligente',
+        'Breakeven Automático',
+        'ADX Filter',
+        'Volume Real',
+        'Risco Dinâmico',
+        'Correlação Filtrada',
+        'Session Filters',
+        'CHOCH/BOS/FVG Reais',
+        'Multi-Timeframe'
+      ],
+      timeframes: '15m + 1h + 4h',
+      minScore: CONFIG.minScore,
+      minADX: CONFIG.minADX,
+      pairs: CONFIG.pairs.length,
+      atrStop: 'ATR × ' + CONFIG.atrMultiplier,
+      maxPositions: CONFIG.maxPositions
     }
   });
 });
 
 app.get('/api/signals', (req, res) => {
-  res.json({ signals: state.signals.slice(0, 20), total: state.signals.length });
+  res.json({ 
+    signals: state.signals.slice(0, 20), 
+    total: state.signals.length 
+  });
 });
 
 app.get('/api/logs', (req, res) => {
-  res.json({ logs: state.logs.slice(0, 100), count: state.logs.length });
+  res.json({ 
+    logs: state.logs.slice(0, 100), 
+    count: state.logs.length 
+  });
+});
+
+app.get('/api/stats', (req, res) => {
+  res.json({
+    stats: state.stats,
+    balance: state.balance,
+    riskMode: state.riskMode,
+    currentRisk: calculateDynamicRisk(),
+    activeTrades: state.pendingTrades
+  });
 });
 
 app.get('/health', (req, res) => res.send('OK'));
 
+// ============================================
+// STARTUP
+// ============================================
+
 app.listen(PORT, async () => {
   addLog('========================================', 'success');
-  addLog('BRUNO TRADER PRO V5.0 - SISTEMA COMPLETO', 'success');
+  addLog('BRUNO TRADER PROFESSIONAL V5.0', 'success');
   addLog('========================================', 'success');
   addLog(`Pares: ${CONFIG.pairs.length}`, 'info');
+  addLog(`Features: Trailing Stop, ADX, Volume Real`, 'info');
+  addLog(`Risco Dinâmico, Correlação, Sessions`, 'info');
+  addLog(`CHOCH/BOS/FVG com dados REAIS`, 'info');
   addLog(`Score mínimo: ${CONFIG.minScore}/100`, 'info');
+  addLog(`ADX mínimo: ${CONFIG.minADX}`, 'info');
   addLog(`Stop: ATR × ${CONFIG.atrMultiplier}`, 'info');
-  addLog(`✅ FASE 1: Trailing + ADX + Volume`, 'success');
-  addLog(`✅ FASE 2: Risco Dinâmico + Correlação + Sessions`, 'success');
-  addLog(`✅ FASE 3: SMC REAL + Dados Precisos`, 'success');
   
-  await sendTelegram(`🚀 BRUNO TRADER PRO V5.0 - SISTEMA COMPLETO
+  await sendTelegram(`🚀 BRUNO TRADER PRO V5.0
 
-━━━━━━━━━━━━━━━━━━
+SISTEMA PROFISSIONAL COMPLETO ATIVADO!
 
-✨ FASE 1 COMPLETA:
+✅ 37 pares verificados Binance.US
+✅ Multi-timeframe (15m/1h/4h)
+✅ Score ponderado (min ${CONFIG.minScore}/100)
+✅ Stop ATR × ${CONFIG.atrMultiplier}
 
-📊 Trailing Stop Inteligente
+🆕 NOVIDADES V5.0:
+
+✨ Trailing Stop Inteligente
    - Breakeven em TP1
    - Trailing em TP2
    - Auto-close TP3
 
-⚡ ADX Filter (Min ${CONFIG.minADX})
-   - Evita laterais
-   - Bonus ADX > 30
+⚡ ADX Filter (min ${CONFIG.minADX})
+   - Evita mercados laterais
+   - Só opera tendências
 
-📈 Volume 24h Melhorado
-   - Análise 96 velas
+📊 Volume Real Melhorado
+   - Análise 24h
    - Spike detection
+   - Crescente confirmado
 
-━━━━━━━━━━━━━━━━━━
-
-🆕 FASE 2 IMPLEMENTADA:
-
-💰 RISCO DINÂMICO
+💰 Gestão de Risco Dinâmica
    - Normal: 2%
    - Recovery: 1% (2+ losses)
    - Boost: 3% (3+ wins)
    - Emergency: 0.5% (DD > 10%)
 
-🎯 CORRELAÇÃO
-   - Max 1 trade/grupo/direção
-   - 6 grupos identificados
+🎯 Filtro de Correlação
+   - 1 trade por grupo
    - Diversificação real
 
-🕐 SESSION FILTERS
-   - Premium: +10 score
-   - Dead zone: -20 score
-   - 3 sessões ativas
+🕐 Session Filters
+   - Horários premium
+   - Evita dead zones
 
-━━━━━━━━━━━━━━━━━━
+📈 CHOCH/BOS/FVG REAIS
+   - Swing points reais
+   - Estrutura calculada
+   - Sem simulação!
 
-🔥 FASE 3 IMPLEMENTADA:
+Modo: ${state.riskMode.toUpperCase()}
+Risco Atual: ${(calculateDynamicRisk() * 100).toFixed(1)}%
 
-📊 SMC COM DADOS REAIS
-   - CHoCH real (não simulado)
-   - BOS real com confirmação
-   - Order Blocks c/ volume
-   - FVG validado (gap > 0.1%)
-   - Liquidity sweep detection
-
-✅ DETECÇÃO PRECISA
-   - Swing detection melhorado
-   - Confirmações em 3 velas
-   - Strength scoring real
-   - Zonas dinâmicas
-
-━━━━━━━━━━━━━━━━━━
-
-📈 SISTEMA BASE:
-
-✅ ${CONFIG.pairs.length} pares Binance.US
-✅ Multi-TF (15m/1h/4h)
-✅ Score min: ${CONFIG.minScore}/100
-✅ Stop: ATR × ${CONFIG.atrMultiplier}
-✅ Max Posições: ${CONFIG.maxPositions}
-✅ Max Exposição: ${CONFIG.maxExposure * 100}%
-
-━━━━━━━━━━━━━━━━━━
-
-🎯 IMPACTO ESPERADO:
-
-FASE 1+2: Win Rate 70-75%
-FASE 3: Win Rate 80-85% 🚀🚀
-Drawdown: -2 to -3%
-Sharpe: 2.5+
-Precisão SMC: +40%
-
-━━━━━━━━━━━━━━━━━━
-
-⏱ SISTEMA COMPLETO - V5.0
-📊 Monitoramento contínuo
+Sistema institucional completo!
 
 ${new Date().toLocaleString('pt-BR')}`);
   
-  setTimeout(() => { addLog('Primeira análise V5.0...', 'info'); analyzeMarket(); }, 10000);
+  setTimeout(() => { 
+    addLog('Primeira análise V5.0...', 'info'); 
+    analyzeMarket(); 
+  }, 10000);
   
-  // Analisa mercado a cada 15 minutos (mantém qualidade)
+  // Análise a cada 15min
   setInterval(analyzeMarket, 900000);
   
-  // Checa resultados a cada 1 minuto (não perde TPs/Stops)
+  // Check trades a cada 1min
   setInterval(checkTradeResults, 60000);
 });
 
-process.on('unhandledRejection', (error) => { addLog(`Erro: ${error.message}`, 'error'); });
+process.on('unhandledRejection', (error) => { 
+  addLog(`Erro: ${error.message}`, 'error'); 
+});
