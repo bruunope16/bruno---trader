@@ -41,21 +41,21 @@ const CONFIG = {
   leverage: 10,
   initialBalance: 1000,
   maxPositions: 3,
-  maxExposure: 0.06,        // 🆕 FASE 2: Máximo 6% exposição total
+  maxExposure: 0.06,
   
-  // FASE 1 - Novidades
-  minADX: 20,               // 🆕 Filtro ADX
-  volumeMultiplier: 1.2,    // 🔧 AJUSTADO: era 1.5 (muito restritivo)
+  // 🆕 V6.0 - DAY TRADE CONFIG
+  minADX: 20,
+  volumeMultiplier: 1.2,
   
-  // Trailing Stop
+  // ❌ V6.0: Trailing/Breakeven REMOVIDOS (você opera manual)
   trailing: {
-    enabled: true,
-    breakeven: true,        // 🆕 Move para breakeven em TP1
-    trailingATR: 1.5,      // 🆕 Trailing em TP2
-    closeOnTP3: true       // 🆕 Fecha tudo em TP3
+    enabled: false,       // 🆕 V6.0: DESATIVADO (gestão manual)
+    breakeven: false,
+    trailingATR: 1.5,
+    closeOnTP3: false
   },
   
-  // 🆕 FASE 2: Grupos de Correlação
+  // 🆕 V6.0: Grupos de Correlação (mantém)
   correlationGroups: {
     highcap: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'],
     layer1: ['SOLUSDT', 'AVAXUSDT', 'NEARUSDT', 'DOTUSDT'],
@@ -67,45 +67,93 @@ const CONFIG = {
              'IOTAUSDT']
   },
   
+  // 🆕 V6.0: STOP POR CATEGORIA (volatilidade do ativo)
+  stopByCategory: {
+    blueChips: {
+      pairs: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'],
+      atrMultiplier: 4.0,
+      label: '🔵 Blue Chip'
+    },
+    alts: {
+      pairs: ['SOLUSDT', 'XRPUSDT', 'ADAUSDT', 'AVAXUSDT', 'DOTUSDT', 
+              'MATICUSDT', 'LINKUSDT', 'LTCUSDT', 'UNIUSDT', 'ATOMUSDT',
+              'XLMUSDT', 'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT', 
+              'NEARUSDT', 'AAVEUSDT', 'COMPUSDT', 'SUSHIUSDT', 'CRVUSDT'],
+      atrMultiplier: 4.5,
+      label: '🟢 Alt'
+    },
+    memecoins: {
+      pairs: ['DOGEUSDT', 'SHIBUSDT', 'PEPEUSDT', 'SANDUSDT', 'MANAUSDT', 
+              'ENJUSDT', 'GALAUSDT', 'APEUSDT', 'CAKEUSDT', 'IOTAUSDT'],
+      atrMultiplier: 5.0,
+      label: '🟡 Memecoin/Smallcap'
+    }
+  },
+  
   scoreWeights: {
     choch: 20, bos: 20, fibonacci: 10, orderBlock: 15, fvg: 15,
     liquidity: 20, emaTrend: 20, macd: 10, rsi: 10, sr: 10,
-    volumeSpike: 15, trendAlignment: 20, adxBonus: 10  // 🆕 ADX bonus
+    volumeSpike: 15, trendAlignment: 20, adxBonus: 10,
+    btcAlignment: 25  // 🆕 V6.0: Penalidade -25 se contra BTC
   },
   
-  minScore: 65,              // Reduzido de 70
+  minScore: 65,
   highConfidence: 85,
-  atrMultiplier: 3.0,        // Stop mais largo
+  atrMultiplier: 3.0,  // ⚠️ FALLBACK (se par não estiver em categoria)
   
-  // Sistema de TP Parcial
+  // 🆕 V6.0: TPs FIXOS (Day Trade)
+  tpFixed: {
+    tp1: 0.7,   // 0.7%
+    tp2: 1.5,   // 1.5%
+    tp3: 2.5    // 2.5%
+  },
+  
+  // 🆕 V6.0: Distribuição manual (você executa)
   tpPartial: {
     enabled: true,
-    tp1Percent: 50,
-    tp2Percent: 30,
-    tp3Percent: 20
+    tp1Percent: 40,    // 40% sai TP1
+    tp2Percent: 40,    // 40% sai TP2
+    tp3Percent: 20     // 20% runner
+  },
+  
+  // 🆕 V6.0: BTC FILTER
+  btcFilter: {
+    enabled: true,
+    timeframe: '4h',
+    penaltyContra: 25,        // -25 score se contra BTC
+    threshold: 0.3            // 0.3% de movimento mínimo para considerar tendência
+  },
+  
+  // 🆕 V6.0: Trade Tracking (acompanha sem operar)
+  tradeTracking: {
+    enabled: true,
+    timeoutHours: 8,          // Para acompanhar após 8h
+    checkInterval: 60         // Verifica TP a cada 60 segundos
+  },
+  
+  // 🆕 V6.0: Volatility Alert
+  volatilityAlert: {
+    enabled: true,
+    btcThreshold: 2.0,        // BTC mexe >2% em 1h = alerta
+    cooldownMinutes: 60       // Não repete alerta antes de 1h
+  },
+  
+  // 🆕 V6.0: Daily Summary
+  dailySummary: {
+    enabled: true,
+    hour: 22,                 // 22h BR
+    timezone: 'America/Sao_Paulo'
   },
   
   pairs: [
-    // TOP COINS - 100% Verificados Binance.US
     'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
     'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT',
     'LINKUSDT', 'LTCUSDT', 'UNIUSDT', 'ATOMUSDT', 'XLMUSDT',
     'ALGOUSDT', 'VETUSDT', 'ICPUSDT', 'FILUSDT', 'NEARUSDT',
-    
-    // DEFI - Verificados
     'AAVEUSDT', 'COMPUSDT', 'SUSHIUSDT', 'CRVUSDT',
-    
-    // GAMING/METAVERSE - Verificados
     'SANDUSDT', 'MANAUSDT', 'ENJUSDT', 'GALAUSDT', 'APEUSDT',
-    
-    // MEME COINS - Verificados
     'SHIBUSDT', 'PEPEUSDT',
-    
-    // OUTROS - Verificados
     'CAKEUSDT', 'IOTAUSDT'
-    
-    // REMOVIDOS (dados insuficientes na Binance.US):
-    // 'CHRUSDT', 'GMTUSDT', 'BNXUSDT'
   ]
 };
 
@@ -114,6 +162,38 @@ let state = {
   signals: [],
   trades: [],
   pendingTrades: [],
+  
+  // 🆕 V6.0: Trades manuais (você marca)
+  manualTrades: [],
+  manualStats: {
+    total: 0,
+    wins: 0,
+    losses: 0,
+    breakeven: 0,
+    tp1Hits: 0,
+    tp2Hits: 0,
+    tp3Hits: 0,
+    winRate: 0,
+    totalProfit: 0
+  },
+  
+  // 🆕 V6.0: Trades em acompanhamento (não opera, só monitora)
+  trackedTrades: [],   // [{ id, symbol, entry, stop, tps, direction, startTime, tpsHit: [], notified }]
+  
+  // 🆕 V6.0: BTC tracking
+  btcStatus: {
+    direction: 'unknown',  // 'up', 'down', 'lateral', 'unknown'
+    change4h: 0,
+    lastUpdate: null,
+    lastVolatilityAlert: null
+  },
+  
+  // 🆕 V6.0: Sistema de aprendizado
+  learning: {
+    bySymbol: {},  // { BTCUSDT: { trades: 10, wins: 6, winRate: 60, scoreAdjust: +5 } }
+    enabled: true
+  },
+  
   stats: { 
     totalTrades: 0, 
     wins: 0, 
@@ -129,8 +209,8 @@ let state = {
   lastAnalysis: null,
   trailingStops: {},
   riskMode: 'normal',
-  lastSignalTime: null,      // 🆕 Cooldown entre sinais
-  signalsByDate: {}          // 🆕 Contador diário para evitar overtrading
+  lastSignalTime: null,
+  signalsByDate: {}
 };
 
 // ============================================
@@ -141,7 +221,6 @@ const STATE_FILE = process.env.STATE_FILE || './bot-state.json';
 
 function saveState() {
   try {
-    // Salva apenas dados essenciais (não logs completos)
     const toSave = {
       balance: state.balance,
       signals: state.signals.slice(0, 50),
@@ -152,6 +231,12 @@ function saveState() {
       riskMode: state.riskMode,
       lastSignalTime: state.lastSignalTime,
       signalsByDate: state.signalsByDate,
+      // 🆕 V6.0: Salva novos campos
+      manualTrades: state.manualTrades.slice(-200),
+      manualStats: state.manualStats,
+      trackedTrades: state.trackedTrades,
+      learning: state.learning,
+      btcStatus: state.btcStatus,
       lastSave: new Date().toISOString()
     };
     
@@ -168,7 +253,6 @@ function loadState() {
     if (fsModule.existsSync(STATE_FILE)) {
       const saved = JSON.parse(fsModule.readFileSync(STATE_FILE, 'utf8'));
       
-      // Merge com estado atual (preserva defaults)
       state.balance = saved.balance || CONFIG.initialBalance;
       state.signals = saved.signals || [];
       state.trades = saved.trades || [];
@@ -178,6 +262,12 @@ function loadState() {
       state.riskMode = saved.riskMode || 'normal';
       state.lastSignalTime = saved.lastSignalTime || null;
       state.signalsByDate = saved.signalsByDate || {};
+      // 🆕 V6.0: Carrega novos campos
+      state.manualTrades = saved.manualTrades || [];
+      state.manualStats = { ...state.manualStats, ...(saved.manualStats || {}) };
+      state.trackedTrades = saved.trackedTrades || [];
+      state.learning = { ...state.learning, ...(saved.learning || {}) };
+      state.btcStatus = { ...state.btcStatus, ...(saved.btcStatus || {}) };
       
       console.log(`✅ Estado carregado: ${state.stats.totalTrades} trades, balance $${state.balance.toFixed(2)}`);
       return true;
@@ -558,6 +648,244 @@ function hasActiveTradeInGroup(symbol, direction) {
 
 // ============================================
 // 🆕 FASE 2: SESSION FILTERS (Horários Premium)
+// ============================================
+
+// ============================================
+// 🆕 V6.0: NOVAS FUNÇÕES DAY TRADE
+// ============================================
+
+// 🆕 V6.0: Pega multiplicador ATR baseado na categoria do par
+function getCategoryATRMult(symbol) {
+  for (const [catKey, catData] of Object.entries(CONFIG.stopByCategory)) {
+    if (catData.pairs.includes(symbol)) {
+      return {
+        multiplier: catData.atrMultiplier,
+        category: catKey,
+        label: catData.label
+      };
+    }
+  }
+  // Fallback se não estiver categorizado
+  return {
+    multiplier: CONFIG.atrMultiplier,
+    category: 'default',
+    label: '⚪ Default'
+  };
+}
+
+// 🆕 V6.0: Detecta tendência do BTC no 4h
+async function getBTCTrend() {
+  try {
+    const btcCandles = await getCandlesticks('BTCUSDT', '4h', 10);
+    
+    if (!btcCandles || btcCandles.length < 5) {
+      return { direction: 'unknown', change: 0, error: 'Sem dados BTC' };
+    }
+    
+    // Pega últimos 4 candles fechados (16h de história)
+    const recent = btcCandles.slice(-5, -1); // ignora candle atual aberto
+    const oldestPrice = recent[0].close;
+    const newestPrice = recent[recent.length - 1].close;
+    
+    const changePct = ((newestPrice - oldestPrice) / oldestPrice) * 100;
+    
+    // Determina direção
+    let direction;
+    if (Math.abs(changePct) < CONFIG.btcFilter.threshold) {
+      direction = 'lateral';
+    } else if (changePct > 0) {
+      direction = 'up';
+    } else {
+      direction = 'down';
+    }
+    
+    // Atualiza state
+    state.btcStatus.direction = direction;
+    state.btcStatus.change4h = changePct;
+    state.btcStatus.lastUpdate = new Date().toISOString();
+    
+    return {
+      direction,
+      change: changePct,
+      currentPrice: newestPrice
+    };
+  } catch (error) {
+    addLog(`Erro ao detectar BTC trend: ${error.message}`, 'error');
+    return { direction: 'unknown', change: 0, error: error.message };
+  }
+}
+
+// 🆕 V6.0: Verifica volatilidade do BTC (movimento 1h)
+async function checkBTCVolatility() {
+  try {
+    const btcCandles = await getCandlesticks('BTCUSDT', '15m', 8);
+    if (!btcCandles || btcCandles.length < 4) return null;
+    
+    // Últimas 4 velas de 15m = 1h
+    const last1h = btcCandles.slice(-5, -1);
+    const oldest = last1h[0].close;
+    const newest = last1h[last1h.length - 1].close;
+    
+    const changePct = ((newest - oldest) / oldest) * 100;
+    
+    // Se movimento > threshold, é volátil
+    if (Math.abs(changePct) >= CONFIG.volatilityAlert.btcThreshold) {
+      // Verifica cooldown
+      const now = Date.now();
+      const lastAlert = state.btcStatus.lastVolatilityAlert ? 
+                       new Date(state.btcStatus.lastVolatilityAlert).getTime() : 0;
+      const minutesSinceLastAlert = (now - lastAlert) / 60000;
+      
+      if (minutesSinceLastAlert >= CONFIG.volatilityAlert.cooldownMinutes) {
+        return { isVolatile: true, change: changePct };
+      }
+    }
+    
+    return { isVolatile: false, change: changePct };
+  } catch (error) {
+    return null;
+  }
+}
+
+// 🆕 V6.0: Aplica filtro BTC no score
+function applyBTCFilter(score, signalDirection, symbol, btcTrend) {
+  // Exceção: BTC, ETH, BNB não sofrem filtro
+  if (['BTCUSDT', 'ETHUSDT', 'BNBUSDT'].includes(symbol)) {
+    return { score, btcAlignment: 'self' };
+  }
+  
+  // Se BTC lateral, sem penalidade
+  if (btcTrend.direction === 'lateral' || btcTrend.direction === 'unknown') {
+    return { score, btcAlignment: 'lateral' };
+  }
+  
+  // BTC alta + sinal LONG = alinhado
+  // BTC baixa + sinal SHORT = alinhado
+  const isAligned = (btcTrend.direction === 'up' && signalDirection === 'LONG') ||
+                    (btcTrend.direction === 'down' && signalDirection === 'SHORT');
+  
+  if (isAligned) {
+    return { score, btcAlignment: 'aligned' };
+  }
+  
+  // Sinal contra BTC = penalidade
+  return { 
+    score: score - CONFIG.btcFilter.penaltyContra,
+    btcAlignment: 'against'
+  };
+}
+
+// 🆕 V6.0: Calcula Setup Quality (estrelas)
+function calculateSetupQuality(signal) {
+  let stars = 0;
+  
+  // Critério 1: Score
+  if (signal.score >= 90) stars += 2;
+  else if (signal.score >= 80) stars += 1;
+  
+  // Critério 2: Volume
+  const volRatio = parseFloat(signal.volumeRatio);
+  if (volRatio >= 3.0) stars += 1;
+  if (volRatio >= 4.0) stars += 1;
+  
+  // Critério 3: ADX (tendência forte)
+  const adx = parseFloat(signal.adx);
+  if (adx >= 30) stars += 1;
+  
+  // Critério 4: BTC alinhado
+  if (signal.btcAlignment === 'aligned') stars += 1;
+  if (signal.btcAlignment === 'self') stars += 1; // BTC/ETH/BNB
+  
+  // Limita a 5 estrelas
+  stars = Math.min(stars, 5);
+  
+  // Garante mínimo 1
+  stars = Math.max(stars, 1);
+  
+  const labels = {
+    1: 'BÁSICO',
+    2: 'MODERADO',
+    3: 'BOM',
+    4: 'MUITO BOM',
+    5: 'PREMIUM'
+  };
+  
+  return {
+    stars,
+    visual: '⭐'.repeat(stars) + '☆'.repeat(5 - stars),
+    label: labels[stars]
+  };
+}
+
+// 🆕 V6.0: Sistema de Aprendizado por par
+function getLearningAdjustment(symbol) {
+  const learn = state.learning.bySymbol[symbol];
+  
+  if (!learn || learn.trades < 5) {
+    return 0; // Sem dados suficientes, sem ajuste
+  }
+  
+  // Calcula ajuste baseado no winRate
+  // > 70% winRate: +5 pontos (confiável)
+  // 50-70%: 0 pontos (neutro)
+  // < 50%: -5 pontos (questionável)
+  // < 30%: -10 pontos (problemático)
+  
+  if (learn.winRate >= 70) return 5;
+  if (learn.winRate >= 50) return 0;
+  if (learn.winRate >= 30) return -5;
+  return -10;
+}
+
+// 🆕 V6.0: Atualiza aprendizado após trade fechado manualmente
+function updateLearning(symbol, result) {
+  if (!state.learning.bySymbol[symbol]) {
+    state.learning.bySymbol[symbol] = {
+      trades: 0,
+      wins: 0,
+      losses: 0,
+      breakeven: 0,
+      winRate: 0,
+      lastUpdate: null
+    };
+  }
+  
+  const learn = state.learning.bySymbol[symbol];
+  learn.trades++;
+  
+  if (result === 'win') learn.wins++;
+  else if (result === 'loss') learn.losses++;
+  else if (result === 'breakeven') learn.breakeven++;
+  
+  // Recalcula winRate (considerando BE como neutro)
+  const decisive = learn.wins + learn.losses;
+  if (decisive > 0) {
+    learn.winRate = (learn.wins / decisive) * 100;
+  }
+  
+  learn.lastUpdate = new Date().toISOString();
+}
+
+// 🆕 V6.0: Formata horário corretamente para BR
+function formatBrazilTime(date = new Date()) {
+  return date.toLocaleTimeString('pt-BR', { 
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+}
+
+function formatBrazilDate(date = new Date()) {
+  return date.toLocaleDateString('pt-BR', { 
+    timeZone: 'America/Sao_Paulo'
+  });
+}
+
+function formatBrazilDateTime(date = new Date()) {
+  return `${formatBrazilDate(date)} ${formatBrazilTime(date)}`;
+}
+
 // ============================================
 
 function getSessionScore() {
@@ -1149,17 +1477,41 @@ async function analyzeSymbol(symbol) {
       };
     }
     
+    // 🆕 V6.0: APLICA FILTRO BTC (-25 se contra)
+    const direction = structure15m.trend === 'bullish' ? 'LONG' : 'SHORT';
+    const btcTrend = state.btcStatus.direction !== 'unknown' ? 
+                     { direction: state.btcStatus.direction, change: state.btcStatus.change4h } :
+                     await getBTCTrend();
+    
+    const btcResult = applyBTCFilter(score, direction, symbol, btcTrend);
+    score = btcResult.score;
+    const btcAlignment = btcResult.btcAlignment;
+    
+    if (btcAlignment === 'against') {
+      confluences.push(`⚠️ BTC contra (${btcTrend.change > 0 ? '📈' : '📉'} ${btcTrend.change.toFixed(2)}%)`);
+    } else if (btcAlignment === 'aligned') {
+      confluences.push(`✅ BTC alinhado (${btcTrend.change > 0 ? '📈' : '📉'} ${btcTrend.change.toFixed(2)}%)`);
+    }
+    
+    // 🆕 V6.0: APLICA APRENDIZADO POR PAR
+    const learningAdjust = getLearningAdjustment(symbol);
+    if (learningAdjust !== 0) {
+      score += learningAdjust;
+      if (learningAdjust > 0) {
+        confluences.push(`📚 Histórico bom (+${learningAdjust})`);
+      } else {
+        confluences.push(`⚠️ Histórico ruim (${learningAdjust})`);
+      }
+    }
+    
     if (score < CONFIG.minScore) return { 
       valid: false, 
-      reason: `Score baixo: ${score}/${CONFIG.minScore}`,
+      reason: `Score baixo: ${score}/${CONFIG.minScore}${btcAlignment === 'against' ? ' (BTC contra -25)' : ''}`,
       score: score,
       volumeRatio: volume.ratio.toFixed(2),
       adx: ind15m.adx.toFixed(1),
-      direction: structure15m.trend === 'bullish' ? 'LONG' : 'SHORT'
+      direction: direction
     };
-    
-    // 🆕 FASE 2: Verifica direção antes dos filtros finais
-    const direction = structure15m.trend === 'bullish' ? 'LONG' : 'SHORT';
     
     // 🆕 FASE 2: FILTRO DE CORRELAÇÃO
     if (hasActiveTradeInGroup(symbol, direction)) {
@@ -1181,26 +1533,33 @@ async function analyzeSymbol(symbol) {
     const entry = price;
     
     const atrValue = ind15m.atr;
-    const atrStop = atrValue * CONFIG.atrMultiplier;
+    
+    // 🆕 V6.0: Stop por categoria do par
+    const categoryInfo = getCategoryATRMult(symbol);
+    const atrStop = atrValue * categoryInfo.multiplier;
     
     let stop, tp1, tp2, tp3;
     
+    // 🆕 V6.0: TPs fixos (Day Trade)
+    const TP1_PCT = CONFIG.tpFixed.tp1 / 100;  // 0.7% = 0.007
+    const TP2_PCT = CONFIG.tpFixed.tp2 / 100;  // 1.5% = 0.015
+    const TP3_PCT = CONFIG.tpFixed.tp3 / 100;  // 2.5% = 0.025
+    
     if (direction === 'LONG') {
       stop = entry - atrStop;
-      tp1 = fib.ext_1272;
-      tp2 = fib.ext_1414;
-      tp3 = fib.ext_1618;
+      tp1 = entry * (1 + TP1_PCT);
+      tp2 = entry * (1 + TP2_PCT);
+      tp3 = entry * (1 + TP3_PCT);
     } else {
       stop = entry + atrStop;
-      tp1 = fib.ext_1272;
-      tp2 = fib.ext_1414;
-      tp3 = fib.ext_1618;
+      tp1 = entry * (1 - TP1_PCT);
+      tp2 = entry * (1 - TP2_PCT);
+      tp3 = entry * (1 - TP3_PCT);
     }
     
     const rr = Math.abs(tp3 - entry) / Math.abs(entry - stop);
     
     // 🔧 FIX: Stop mínimo DINÂMICO baseado em ATR (não fixo em 0.5%)
-    // Em cripto volátil, 0.5% é muito apertado
     const minStopDistance = Math.max(0.005, (atrValue / entry) * 1.5);
     if (Math.abs(entry - stop) / entry < minStopDistance) {
       return { valid: false, reason: `Stop muito próximo (${(minStopDistance * 100).toFixed(2)}% mínimo)` };
@@ -1237,6 +1596,14 @@ async function analyzeSymbol(symbol) {
       }
     }
     
+    // 🆕 V6.0: Calcula Setup Quality
+    const setupQuality = calculateSetupQuality({
+      score, 
+      volumeRatio: volume.ratio.toFixed(2),
+      adx: ind15m.adx.toFixed(1),
+      btcAlignment
+    });
+    
     return {
       valid: true, symbol, direction,
       entry: formatPrice(entry), stopLoss: formatPrice(stop),
@@ -1247,9 +1614,21 @@ async function analyzeSymbol(symbol) {
       volumeRatio: volume.ratio.toFixed(2), atr: formatPrice(atrValue),
       adx: ind15m.adx.toFixed(1),
       timestamp: new Date().toISOString(),
+      // 🆕 V6.0: Novos campos
+      btcAlignment,
+      btcChange: btcTrend.change ? btcTrend.change.toFixed(2) : '0',
+      btcDirection: btcTrend.direction,
+      category: categoryInfo.category,
+      categoryLabel: categoryInfo.label,
+      atrMultiplier: categoryInfo.multiplier,
+      setupQuality: setupQuality.stars,
+      setupVisual: setupQuality.visual,
+      setupLabel: setupQuality.label,
+      // Tracking
       reachedTP1: false,
       reachedTP2: false,
-      trailingActive: false
+      reachedTP3: false,
+      stopHit: false
     };
     
   } catch (error) {
@@ -1425,88 +1804,62 @@ async function analyzeMarket() {
         confluencesText = confluencesText.substring(0, 497) + '...';
       }
       
-      const message = `🚨 FUTURES SIGNAL V5.0 | ${signal.symbol}
+      const message = `🚨 DAY TRADE SIGNAL V6.0 | ${signal.symbol}
 
 📈 Direção: ${signal.direction}
 ⚡ Alavancagem: ${CONFIG.leverage}x
-🎯 Score: ${signal.score}/100
-📊 ADX: ${signal.adx} (Tendência ${signal.adx > 30 ? 'Forte' : 'Média'})
-
-━━━━━━━━━━━━━━━━━━
-
-📡 Exchange: Binance Futures
-⏱ Timeframe: 15m
-📊 Tipo: Scalping Profissional V5.0
-⏳ Duração Estimada: 2h — 6h
-
-━━━━━━━━━━━━━━━━━━
+${signal.setupVisual} ${signal.setupLabel}
 
 💰 Entrada: ${signal.entry}
 📍 Zona: ${zoneMin} — ${zoneMax}
-
 🛑 Stop Loss: ${signal.stopLoss}
-⚠️ Risco: ${riskPercent}%
-📏 ATR: ${signal.atr}
-
-━━━━━━━━━━━━━━━━━━
 
 🎯 Take Profits
 
-🥇 TP1: ${signal.tp1} (${tp1Percent > 0 ? '+' : ''}${tp1Percent}%)
-🥈 TP2: ${signal.tp2} (${tp2Percent > 0 ? '+' : ''}${tp2Percent}%)
-🥉 TP3: ${signal.tp3} (${tp3Percent > 0 ? '+' : ''}${tp3Percent}%)
-
-━━━━━━━━━━━━━━━━━━
-
+🥇 TP1: ${signal.tp1} (+${CONFIG.tpFixed.tp1}%)
+🥈 TP2: ${signal.tp2} (+${CONFIG.tpFixed.tp2}%)
+🥉 TP3: ${signal.tp3} (+${CONFIG.tpFixed.tp3}%)
+━━━━━━━━━━━━━━━━━
 📊 Risk / Reward
 📉 Risco: ${Math.abs(parseFloat(riskPercent))}%
-📈 Retorno Máx: ${Math.abs(parseFloat(tp3Percent))}%
+📈 Retorno Máx: ${CONFIG.tpFixed.tp3}%
 ⚖️ RR: 1:${signal.rr}
-
-━━━━━━━━━━━━━━━━━━
-
-✨ Proteções FASE 1+2
-
-✅ Breakeven em TP1
-✅ Trailing Stop em TP2
-✅ Fechamento automático TP3
-⚡ ADX Filter Ativo (${signal.adx})
-📊 Volume 24h Confirmado (${signal.volumeRatio}x)
-💰 Risco Dinâmico: ${(calculateDynamicRisk() * 100).toFixed(1)}%
-🎯 Modo: ${state.riskMode.toUpperCase()}
-🔒 Correlação Filtrada
-🕐 Session Filter
-
-━━━━━━━━━━━━━━━━━━
-
+━━━━━━━━━━━━━━━━━
 📊 Dados do Trade
 
 📊 Tendência: ${trendText}
 📈 Volume: ${volumeText} (${signal.volumeRatio}x)
 ⚡ Força: ${forceText}
 🔥 Volatilidade: Média/Alta
-
+🎯 Score: ${signal.score}/100
+📊 ADX: ${signal.adx} (Tendência ${signal.adx > 30 ? 'Forte' : 'Média'})
+📏 ATR: ${signal.atr}
+${signal.btcAlignment === 'self' 
+  ? '📊 BTC: ⭐ Próprio ativo' 
+  : `📊 BTC: ${signal.btcDirection === 'up' ? '📈' : signal.btcDirection === 'down' ? '📉' : '➡️'} ${signal.btcChange > 0 ? '+' : ''}${signal.btcChange}% (4h) ${signal.btcAlignment === 'aligned' ? '✅' : signal.btcAlignment === 'against' ? '⚠️' : '➡️'}`}
+🏷️ Categoria: ${signal.categoryLabel} (Stop ATR×${signal.atrMultiplier})
 ━━━━━━━━━━━━━━━━━━
-
 📊 Força do Sinal
 ${greenBars}${grayBars} ${signal.score}%
-
 ━━━━━━━━━━━━━━━━━━
-
 ✅ Confluências Detectadas:
 ${confluencesText}
+━━━━━━━━━━━━━━━━━━
+📡 Exchange: Binance Futures
+⏱ Timeframe: 15m
+📊 Tipo: Day Trade Profissional V6.0
+⏳ Duração Estimada: 2h — 8h
+━━━━━━━━━━━━━━━━━
+📅 Data: ${formatBrazilDate()}
+🕐 Horário: ${formatBrazilTime()} (UTC-3)
 
 ━━━━━━━━━━━━━━━━━━
 
-📅 Data: ${new Date().toLocaleDateString('pt-BR')}
-🕐 Horário: ${new Date().toLocaleTimeString('pt-BR')} (UTC-3)
-
-━━━━━━━━━━━━━━━━━━
-
-🤖 Bruno Trader Pro V5.0 - SISTEMA COMPLETO
-🚀 Sistema Profissional Completo
-✨ Trailing + ADX + Volume + Risco Dinâmico
-📡 Binance Futures`;
+💡 Gestão sugerida (40/40/20):
+• 40% sai TP1
+• 40% sai TP2
+• 20% runner TP3
+• Move stop pra entrada após TP1`;
       
       // 🆕 FASE 3: Gera e envia gráfico PRIMEIRO
       try {
@@ -1528,14 +1881,14 @@ ${confluencesText}
       // Envia mensagem de texto
       await sendToGroup(message);
       
-      // 🆕 SISTEMA "LEARNING": Aguarda confirmação de toque na zona de entrada
-      // Trade só fica ATIVO após o preço tocar a zona (±0.3% do entry)
-      signal.status = 'pending_entry';
-      signal.zoneMin = entryPrice * 0.997;
-      signal.zoneMax = entryPrice * 1.003;
+      // 🆕 V6.0: Adiciona ao tracking (não opera, só monitora)
       signal.signalTime = Date.now();
       
-      state.pendingTrades.push(signal);
+      // Mantém para compat (caso pendingTrades seja usado em outros lugares)
+      signal.status = 'tracking';
+      
+      // 🆕 V6.0: Adiciona ao novo sistema de tracking
+      trackNewTrade(signal);
       
       // 🆕 Atualiza controles de overtrading
       state.lastSignalTime = Date.now();
@@ -1543,7 +1896,7 @@ ${confluencesText}
       state.signalsByDate = state.signalsByDate || {};
       state.signalsByDate[today] = (state.signalsByDate[today] || 0) + 1;
       
-      addLog(`SINAL: ${signal.symbol} ${signal.direction} (${signal.score}/100) - Aguardando entrada`, 'success');
+      addLog(`📡 SINAL: ${signal.symbol} ${signal.direction} (${signal.score}/100, ${signal.setupVisual})`, 'success');
     } else {
       addLog('Nenhum setup de alta qualidade encontrado', 'info');
     }
@@ -1555,370 +1908,158 @@ ${confluencesText}
   }
 }
 
-// Flag para evitar checkTradeResults rodar em paralelo
+// Flag para evitar checkTrackedTrades rodar em paralelo
 let isCheckingTrades = false;
 
-async function checkTradeResults() {
-  if (state.pendingTrades.length === 0) return;
+// 🆕 V6.0: Adiciona trade para tracking (não opera, só monitora)
+function trackNewTrade(signal) {
+  const tracked = {
+    id: `${signal.symbol}_${Date.now()}`,
+    symbol: signal.symbol,
+    direction: signal.direction,
+    entry: parseFloat(signal.entry),
+    stop: parseFloat(signal.stopLoss),
+    tp1: parseFloat(signal.tp1),
+    tp2: parseFloat(signal.tp2),
+    tp3: parseFloat(signal.tp3),
+    startTime: new Date().toISOString(),
+    btcDirectionAtStart: state.btcStatus.direction,
+    tpsHit: [],
+    stopHit: false,
+    timeoutHit: false,
+    btcChangedNotified: false
+  };
   
-  // 🔒 Previne execução paralela (race condition)
-  if (isCheckingTrades) {
-    console.log('checkTradeResults já em execução, pulando...');
-    return;
-  }
+  state.trackedTrades.push(tracked);
+  addLog(`📡 Acompanhando ${signal.symbol} ${signal.direction}`, 'info');
+  return tracked;
+}
+
+// 🆕 V6.0: Verifica TPs/Stop dos trades tracked (não fecha, só notifica)
+async function checkTrackedTrades() {
+  if (state.trackedTrades.length === 0) return;
+  
+  if (isCheckingTrades) return;
   isCheckingTrades = true;
   
   try {
-    // Iterar de trás pra frente já é correto para splice
-    for (let i = state.pendingTrades.length - 1; i >= 0; i--) {
-      const trade = state.pendingTrades[i];
-      const timeSince = Date.now() - new Date(trade.timestamp).getTime();
-      const hoursSince = timeSince / (1000 * 60 * 60);
+    const now = Date.now();
+    const timeoutMs = CONFIG.tradeTracking.timeoutHours * 60 * 60 * 1000;
+    
+    for (let i = state.trackedTrades.length - 1; i >= 0; i--) {
+      const trade = state.trackedTrades[i];
       
-      if (hoursSince < 0.25) continue; // Aguarda 15min mínimo
+      // Verifica timeout (8h)
+      const elapsedMs = now - new Date(trade.startTime).getTime();
+      if (elapsedMs >= timeoutMs && !trade.timeoutHit) {
+        trade.timeoutHit = true;
+        await sendToGroup(`⏰ ${trade.symbol} - Trade timeout
+8h sem TP3 ou stop
+Bot parou de acompanhar`);
+        state.trackedTrades.splice(i, 1);
+        continue;
+      }
       
-      const candles = await getCandlesticks(trade.symbol, '15m', 20);
-      if (!candles || candles.length < 2) continue;
-      
-      // Usar último candle (mais recente)
-      const currentPrice = candles[candles.length - 1].close;
-      const entry = parseFloat(trade.entry);
-      let stop = parseFloat(trade.stopLoss);
-      const tp1 = parseFloat(trade.tp1);
-      const tp2 = parseFloat(trade.tp2);
-      const tp3 = parseFloat(trade.tp3);
-      const atr = parseFloat(trade.atr);
-      
-      // ============================================
-      // 🆕 SISTEMA "LEARNING": CONFIRMAÇÃO DE TOQUE
-      // ============================================
-      // Trade só vira ATIVO após o preço tocar a zona de entrada
-      // Evita entradas em sinais que nunca foram executáveis
-      if (trade.status === 'pending_entry') {
-        const zoneMin = trade.zoneMin || entry * 0.997;
-        const zoneMax = trade.zoneMax || entry * 1.003;
+      try {
+        // Pega preço atual
+        const candles = await getCandlesticks(trade.symbol, '1m', 5);
+        if (!candles || candles.length === 0) continue;
         
-        // Verifica se alguma vela recente tocou a zona
-        const recentCandles = candles.slice(-5); // Últimas 5 velas (~75min)
-        const touchedZone = recentCandles.some(c => 
-          (c.low <= zoneMax && c.high >= zoneMin)
-        );
+        const currentPrice = candles[candles.length - 1].close;
+        const isLong = trade.direction === 'LONG';
         
-        if (touchedZone) {
-          // ✅ Preço tocou a zona - ativa o trade
-          trade.status = 'active';
-          trade.activatedAt = new Date().toISOString();
-          addLog(`${trade.symbol}: ✅ Entrada CONFIRMADA - trade ativo`, 'success');
-          await sendToGroup(`✅ ${trade.symbol} ${trade.direction}\n\nEntrada CONFIRMADA!\nPreço tocou a zona de entrada.\nTrade agora ATIVO.\n\n🎯 Monitorando TPs e Stop...`);
-        } else {
-          // Se passou mais de 4h sem tocar, cancela o sinal
-          const hoursElapsed = (Date.now() - (trade.signalTime || Date.now())) / (1000 * 60 * 60);
-          if (hoursElapsed > 4) {
-            addLog(`${trade.symbol}: ❌ Sinal expirado (4h sem toque na zona)`, 'warning');
-            await sendToGroup(`⏰ ${trade.symbol} ${trade.direction}\n\nSinal EXPIRADO.\nPreço não tocou a zona de entrada em 4h.\n\n📊 Sem trade executado.`);
-            state.pendingTrades.splice(i, 1);
+        // Verifica TP1
+        if (!trade.tpsHit.includes('TP1')) {
+          const tp1Hit = isLong ? currentPrice >= trade.tp1 : currentPrice <= trade.tp1;
+          if (tp1Hit) {
+            trade.tpsHit.push('TP1');
+            await sendToGroup(`🟢 ${trade.symbol} - TP1 atingido (+${CONFIG.tpFixed.tp1}%)`);
           }
-          continue; // Não processa TPs/Stop se ainda não foi ativado
         }
-      }
-    
-    // ============================================
-    // 🆕 FASE 1: TRAILING STOP LOGIC
-    // ============================================
-    
-    if (trade.direction === 'LONG') {
-      // TP1 batido: Move stop para breakeven
-      if (currentPrice >= tp1 && !trade.reachedTP1 && CONFIG.trailing.breakeven) {
-        trade.stopLoss = formatPrice(entry);
-        trade.reachedTP1 = true;
-        addLog(`${trade.symbol}: TP1 atingido! Stop → Breakeven`, 'success');
-        await sendToGroup(`🟢 ${trade.symbol} LONG\n\nTP1 atingido!\nStop movido para breakeven: $${formatPrice(entry)}\n\n✅ Capital protegido!`);
-      }
-      
-      // TP2 batido: Ativa trailing stop
-      if (currentPrice >= tp2 && trade.reachedTP1 && !trade.trailingActive) {
-        trade.trailingActive = true;
-        addLog(`${trade.symbol}: TP2 atingido! Trailing stop ativo`, 'success');
-        await sendToGroup(`🟢 ${trade.symbol} LONG\n\nTP2 atingido!\nTrailing Stop ATIVO!\n\n⚡ Seguindo o movimento...`);
-      }
-      
-      // Trailing stop ativo: Ajusta stop
-      if (trade.trailingActive) {
-        // 🔧 FIX: Recalcula ATR com dados atuais (não usa ATR do momento do sinal)
-        const currentATR = calculateCurrentATR(candles);
-        const trailingStop = currentPrice - (currentATR * CONFIG.trailing.trailingATR);
-        if (trailingStop > parseFloat(trade.stopLoss)) {
-          trade.stopLoss = formatPrice(trailingStop);
-          addLog(`${trade.symbol}: Trailing → $${formatPrice(trailingStop)} (ATR atual: ${currentATR.toFixed(4)})`, 'info');
+        
+        // Verifica TP2
+        if (!trade.tpsHit.includes('TP2')) {
+          const tp2Hit = isLong ? currentPrice >= trade.tp2 : currentPrice <= trade.tp2;
+          if (tp2Hit) {
+            trade.tpsHit.push('TP2');
+            await sendToGroup(`🟢 ${trade.symbol} - TP2 atingido (+${CONFIG.tpFixed.tp2}%)`);
+          }
         }
-        stop = parseFloat(trade.stopLoss);
-      }
-      
-      // 🆕 ALERTA DE MOMENTUM FRACO (só se já passou TP1 - lucro protegido)
-      if (trade.reachedTP1 && !trade.weaknessAlerted) {
-        const momentum = analyzeMomentumWeakness(candles, 'LONG');
-        if (momentum.weakening) {
-          trade.weaknessAlerted = true; // Só alerta uma vez
-          addLog(`${trade.symbol}: ⚠️ Momentum enfraquecendo`, 'warning');
-          await sendToGroup(`⚠️ ${trade.symbol} LONG - MOMENTUM FRACO
-
-Sinais detectados:
-${momentum.signals.map(s => '• ' + s).join('\n')}
-
-📊 Detalhes:
-- Volume: ${momentum.volumeDrop}
-- Range: ${momentum.rangeDrop}
-- Velas contra: ${momentum.contraryCandles}
-
-💡 SUGESTÃO: Considerar saída parcial ou total
-✅ Capital já protegido (breakeven)`);
+        
+        // Verifica TP3
+        if (!trade.tpsHit.includes('TP3')) {
+          const tp3Hit = isLong ? currentPrice >= trade.tp3 : currentPrice <= trade.tp3;
+          if (tp3Hit) {
+            trade.tpsHit.push('TP3');
+            await sendToGroup(`🟢 ${trade.symbol} - TP3 atingido (+${CONFIG.tpFixed.tp3}%)`);
+            // TP3 = encerra acompanhamento
+            state.trackedTrades.splice(i, 1);
+            continue;
+          }
         }
-      }
-      
-      // TP3 batido: Fecha tudo
-      if (currentPrice >= tp3 && CONFIG.trailing.closeOnTP3) {
-        closeTradeWithResult(trade, i, {
-          outcome: 'WIN',
-          exit: tp3,
-          level: 'TP3',
-          profit: ((tp3 - entry) / entry) * 100,
-          duration: hoursSince.toFixed(1) + 'h'
-        });
-        continue;
-      }
-      
-      // Checa stop e TPs
-      if (currentPrice <= stop) {
-        closeTradeWithResult(trade, i, {
-          outcome: 'LOSS',
-          exit: stop,
-          level: 'STOP',
-          profit: ((stop - entry) / entry) * 100,
-          duration: hoursSince.toFixed(1) + 'h'
-        });
-      } else if (currentPrice >= tp2 && !trade.trailingActive) {
-        closeTradeWithResult(trade, i, {
-          outcome: 'WIN',
-          exit: tp2,
-          level: 'TP2',
-          profit: ((tp2 - entry) / entry) * 100,
-          duration: hoursSince.toFixed(1) + 'h'
-        });
-      } else if (currentPrice >= tp1 && !trade.reachedTP1) {
-        closeTradeWithResult(trade, i, {
-          outcome: 'WIN',
-          exit: tp1,
-          level: 'TP1',
-          profit: ((tp1 - entry) / entry) * 100,
-          duration: hoursSince.toFixed(1) + 'h'
-        });
-      }
-      
-    } else { // SHORT
-      if (currentPrice <= tp1 && !trade.reachedTP1 && CONFIG.trailing.breakeven) {
-        trade.stopLoss = formatPrice(entry);
-        trade.reachedTP1 = true;
-        addLog(`${trade.symbol}: TP1 atingido! Stop → Breakeven`, 'success');
-        await sendToGroup(`🟢 ${trade.symbol} SHORT\n\nTP1 atingido!\nStop movido para breakeven: $${formatPrice(entry)}\n\n✅ Capital protegido!`);
-      }
-      
-      if (currentPrice <= tp2 && trade.reachedTP1 && !trade.trailingActive) {
-        trade.trailingActive = true;
-        addLog(`${trade.symbol}: TP2 atingido! Trailing stop ativo`, 'success');
-        await sendToGroup(`🟢 ${trade.symbol} SHORT\n\nTP2 atingido!\nTrailing Stop ATIVO!\n\n⚡ Seguindo o movimento...`);
-      }
-      
-      if (trade.trailingActive) {
-        // 🔧 FIX: ATR dinâmico também para SHORT
-        const currentATR = calculateCurrentATR(candles);
-        const trailingStop = currentPrice + (currentATR * CONFIG.trailing.trailingATR);
-        if (trailingStop < parseFloat(trade.stopLoss)) {
-          trade.stopLoss = formatPrice(trailingStop);
-          addLog(`${trade.symbol}: Trailing → $${formatPrice(trailingStop)} (ATR atual: ${currentATR.toFixed(4)})`, 'info');
+        
+        // Verifica STOP
+        if (!trade.stopHit) {
+          const stopHit = isLong ? currentPrice <= trade.stop : currentPrice >= trade.stop;
+          if (stopHit) {
+            trade.stopHit = true;
+            await sendToGroup(`🔴 ${trade.symbol} - Stop atingido`);
+            // Stop = encerra acompanhamento
+            state.trackedTrades.splice(i, 1);
+            continue;
+          }
         }
-        stop = parseFloat(trade.stopLoss);
-      }
-      
-      // 🆕 ALERTA DE MOMENTUM FRACO para SHORT
-      if (trade.reachedTP1 && !trade.weaknessAlerted) {
-        const momentum = analyzeMomentumWeakness(candles, 'SHORT');
-        if (momentum.weakening) {
-          trade.weaknessAlerted = true;
-          addLog(`${trade.symbol}: ⚠️ Momentum enfraquecendo`, 'warning');
-          await sendToGroup(`⚠️ ${trade.symbol} SHORT - MOMENTUM FRACO
-
-Sinais detectados:
-${momentum.signals.map(s => '• ' + s).join('\n')}
-
-📊 Detalhes:
-- Volume: ${momentum.volumeDrop}
-- Range: ${momentum.rangeDrop}
-- Velas contra: ${momentum.contraryCandles}
-
-💡 SUGESTÃO: Considerar saída parcial ou total
-✅ Capital já protegido (breakeven)`);
+        
+        // Verifica se BTC virou contra o trade (avisa só se ainda não notificou)
+        if (!trade.btcChangedNotified) {
+          const currentBTC = state.btcStatus.direction;
+          const tradeBTCStart = trade.btcDirectionAtStart;
+          
+          // Detecta mudança contra
+          let btcAgainst = false;
+          if (isLong && currentBTC === 'down' && tradeBTCStart !== 'down') btcAgainst = true;
+          if (!isLong && currentBTC === 'up' && tradeBTCStart !== 'up') btcAgainst = true;
+          
+          if (btcAgainst) {
+            trade.btcChangedNotified = true;
+            const btcEmoji = currentBTC === 'up' ? '📈' : '📉';
+            await sendToGroup(`⚠️ ${trade.symbol} - BTC mudou direção
+BTC agora: ${btcEmoji} ${state.btcStatus.change4h.toFixed(2)}%
+Cuidado com seu trade`);
+          }
         }
-      }
-      
-      if (currentPrice <= tp3 && CONFIG.trailing.closeOnTP3) {
-        closeTradeWithResult(trade, i, {
-          outcome: 'WIN',
-          exit: tp3,
-          level: 'TP3',
-          profit: ((entry - tp3) / entry) * 100,
-          duration: hoursSince.toFixed(1) + 'h'
-        });
-        continue;
-      }
-      
-      if (currentPrice >= stop) {
-        closeTradeWithResult(trade, i, {
-          outcome: 'LOSS',
-          exit: stop,
-          level: 'STOP',
-          profit: ((entry - stop) / entry) * 100,
-          duration: hoursSince.toFixed(1) + 'h'
-        });
-      } else if (currentPrice <= tp2 && !trade.trailingActive) {
-        closeTradeWithResult(trade, i, {
-          outcome: 'WIN',
-          exit: tp2,
-          level: 'TP2',
-          profit: ((entry - tp2) / entry) * 100,
-          duration: hoursSince.toFixed(1) + 'h'
-        });
-      } else if (currentPrice <= tp1 && !trade.reachedTP1) {
-        closeTradeWithResult(trade, i, {
-          outcome: 'WIN',
-          exit: tp1,
-          level: 'TP1',
-          profit: ((entry - tp1) / entry) * 100,
-          duration: hoursSince.toFixed(1) + 'h'
-        });
+      } catch (error) {
+        // Erro no par específico, continua os outros
+        console.error(`Erro ao verificar ${trade.symbol}:`, error.message);
       }
     }
-  }
   } catch (error) {
-    addLog(`Erro em checkTradeResults: ${error.message}`, 'error');
-    console.error(error);
+    addLog(`Erro em checkTrackedTrades: ${error.message}`, 'error');
   } finally {
     isCheckingTrades = false;
   }
 }
 
-async function closeTradeWithResult(trade, index, result) {
-  const completed = { ...trade, ...result, closedAt: new Date().toISOString() };
+// 🆕 V6.0: Verifica volatilidade do BTC e alerta
+async function checkAndAlertVolatility() {
+  if (!CONFIG.volatilityAlert.enabled) return;
+  if (state.trackedTrades.length === 0) return; // Só alerta se tiver trades abertos
   
-  // 🆕 FASE 2: Usa risco dinâmico ao invés de fixo
-  const currentRisk = calculateDynamicRisk();
-  
-  state.stats.totalTrades++;
-  
-  // 🔧 FIX: Cálculo REALISTA de PnL
-  const entry = parseFloat(trade.entry);
-  const exit = parseFloat(result.exit);
-  const stop = parseFloat(trade.stopLoss);
-  
-  // Calcula position size baseado no risco e distância do stop
-  const stopDistance = Math.abs(entry - stop) / entry; // % de distância
-  const riskAmount = state.balance * currentRisk; // R$ em risco
-  const positionSize = riskAmount / stopDistance; // Tamanho da posição
-  
-  // Calcula PnL real baseado na posição
-  const priceMove = trade.direction === 'LONG' ? 
-    (exit - entry) / entry : 
-    (entry - exit) / entry;
-  
-  // 🔧 FIX: Adiciona slippage de 0.1%
-  const slippage = 0.001;
-  const adjustedPriceMove = result.outcome === 'WIN' ? 
-    priceMove - slippage : 
-    priceMove + slippage; // Slippage sempre contra nós
-  
-  const pnlValue = positionSize * adjustedPriceMove * CONFIG.leverage;
-  
-  if (result.outcome === 'WIN') {
-    state.stats.wins++;
-    state.stats.consecutiveWins++;
-    state.stats.consecutiveLosses = 0;
+  const vol = await checkBTCVolatility();
+  if (vol && vol.isVolatile) {
+    const emoji = vol.change > 0 ? '📈' : '📉';
+    const direction = vol.change > 0 ? 'subiu' : 'caiu';
     
-    state.stats.totalProfit += pnlValue;
-    state.balance += pnlValue;
-  } else {
-    state.stats.losses++;
-    state.stats.consecutiveLosses++;
-    state.stats.consecutiveWins = 0;
+    await sendToGroup(`🚨 ALERTA - MERCADO VOLÁTIL
+
+BTC ${emoji} ${direction} ${Math.abs(vol.change).toFixed(2)}% na última hora
+⚠️ Cuidado com trades abertos
+💡 Sugestão: realizar lucros parciais`);
     
-    // LOSS sempre limitado ao risco definido
-    const lossValue = Math.min(Math.abs(pnlValue), riskAmount);
-    state.stats.totalProfit -= lossValue;
-    state.balance -= lossValue;
+    state.btcStatus.lastVolatilityAlert = new Date().toISOString();
   }
-  
-  // 🆕 FASE 2: Atualiza drawdown máximo
-  const currentDrawdown = (CONFIG.initialBalance - state.balance) / CONFIG.initialBalance;
-  if (currentDrawdown > state.stats.maxDrawdown) {
-    state.stats.maxDrawdown = currentDrawdown;
-  }
-  
-  state.stats.winRate = ((state.stats.wins / state.stats.totalTrades) * 100).toFixed(1);
-  state.trades.unshift(completed);
-  state.pendingTrades.splice(index, 1);
-  
-  const emoji = result.outcome === 'WIN' ? '🟢' : '🔴';
-  const outcomeText = result.outcome === 'WIN' ? 'GREEN ✅' : 'RED ❌';
-  const profitSign = result.profit > 0 ? '+' : '';
-  
-  const msg = `${emoji} RESULTADO ${outcomeText}
-
-━━━━━━━━━━━━━━━━━━
-
-📊 Trade: ${trade.symbol} ${trade.direction}
-💰 Entrada: $${trade.entry}
-🎯 Saída: ${result.level} $${formatPrice(result.exit)}
-
-━━━━━━━━━━━━━━━━━━
-
-💵 Resultado:
-${result.outcome === 'WIN' ? '✅' : '❌'} Profit: ${profitSign}${result.profit.toFixed(2)}%
-⏱ Duração: ${result.duration}
-📊 Score: ${trade.score}/100
-📈 ADX: ${trade.adx}
-
-━━━━━━━━━━━━━━━━━━
-
-📈 Estatísticas Atualizadas:
-
-💰 Banca: R$ ${state.balance.toFixed(2)}
-📊 Total Trades: ${state.stats.totalTrades}
-✅ Wins: ${state.stats.wins}
-❌ Losses: ${state.stats.losses}
-📈 Win Rate: ${state.stats.winRate}%
-📉 Drawdown Máx: ${(state.stats.maxDrawdown * 100).toFixed(1)}%
-
-━━━━━━━━━━━━━━━━━━
-
-🆕 FASE 2 - Risco Dinâmico:
-
-🎯 Modo: ${state.riskMode.toUpperCase()}
-💵 Risco Atual: ${(calculateDynamicRisk() * 100).toFixed(1)}%
-🔥 Consecutivos: ${result.outcome === 'WIN' ? state.stats.consecutiveWins + ' wins' : state.stats.consecutiveLosses + ' losses'}
-
-━━━━━━━━━━━━━━━━━━
-
-📅 ${new Date().toLocaleDateString('pt-BR')}
-🕐 ${new Date().toLocaleTimeString('pt-BR')}
-
-━━━━━━━━━━━━━━━━━━
-
-🤖 Bruno Trader Pro V5.0 - SISTEMA COMPLETO
-✨ Trailing Stop + ADX + Volume
-💰 Risco Dinâmico + Correlação
-🕐 Session Filters`;
-  
-  await sendToGroup(msg);
-  addLog(`${emoji} ${trade.symbol}: ${result.outcome} (${profitSign}${result.profit.toFixed(2)}%)`, result.outcome === 'WIN' ? 'success' : 'error');
 }
+
 
 const app = express();
 app.use(express.json());
@@ -1927,23 +2068,29 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'online', 
-    version: '5.0.0 - Professional Complete',  // 🔧 FIX: Versão correta
+    version: '6.0.0 - Day Trade Profissional',
     uptime: process.uptime(),
     analysisCount: state.analysisCount, 
     signalsCount: state.signals.length,
-    pendingTrades: state.pendingTrades.length, 
+    trackedTrades: state.trackedTrades.length,
     lastAnalysis: state.lastAnalysis,
-    stats: state.stats,
+    
+    // 🆕 V6.0: Stats manuais (do /trade)
+    manualStats: state.manualStats,
+    
+    // 🆕 V6.0: BTC status
+    btcStatus: state.btcStatus,
+    
     riskMode: state.riskMode,
-    balance: state.balance,
     config: {
-      style: 'Scalp Profissional Multi-TF', 
-      timeframes: '15m + 1h + 4h',
+      style: 'Day Trade Profissional V6.0', 
+      timeframes: '15m + 1h + 4h + BTC 4h',
       minScore: CONFIG.minScore, 
       pairs: CONFIG.pairs.length,
-      atrStop: 'ATR × ' + CONFIG.atrMultiplier,
-      volumeMultiplier: CONFIG.volumeMultiplier,
-      minADX: CONFIG.minADX
+      tps: `${CONFIG.tpFixed.tp1}% / ${CONFIG.tpFixed.tp2}% / ${CONFIG.tpFixed.tp3}%`,
+      btcFilterEnabled: CONFIG.btcFilter.enabled,
+      btcPenalty: CONFIG.btcFilter.penaltyContra,
+      categories: Object.keys(CONFIG.stopByCategory).length
     }
   });
 });
@@ -1956,8 +2103,29 @@ app.get('/api/logs', (req, res) => {
   res.json({ logs: state.logs.slice(0, 100), count: state.logs.length });
 });
 
+// 🆕 V6.0: Endpoint de trades acompanhados (substitui pending)
+app.get('/api/tracked', (req, res) => {
+  res.json({ tracked: state.trackedTrades, count: state.trackedTrades.length });
+});
+
+// 🆕 V6.0: Endpoint de aprendizado
+app.get('/api/learning', (req, res) => {
+  res.json({ learning: state.learning.bySymbol });
+});
+
 // 🆕 ENDPOINT DE ESTATÍSTICAS DETALHADAS
 app.get('/api/stats', (req, res) => {
+  // 🆕 V6.0: Usa stats manuais
+  res.json({
+    manual: state.manualStats,
+    learning: state.learning.bySymbol,
+    btc: state.btcStatus,
+    todaySignals: state.signalsByDate[new Date().toISOString().split('T')[0]] || 0
+  });
+});
+
+// (mantém endpoint antigo para compat)
+app.get('/api/stats-old', (req, res) => {
   const trades = state.trades;
   
   if (trades.length === 0) {
@@ -2077,106 +2245,335 @@ app.get('/health', (req, res) => res.send('OK'));
 
 app.listen(PORT, async () => {
   addLog('========================================', 'success');
-  addLog('BRUNO TRADER PRO V5.0 - SISTEMA COMPLETO', 'success');
+  addLog('BRUNO TRADER PRO V6.0 - DAY TRADE PROFISSIONAL', 'success');
   addLog('========================================', 'success');
   addLog(`Pares: ${CONFIG.pairs.length}`, 'info');
   addLog(`Score mínimo: ${CONFIG.minScore}/100`, 'info');
-  addLog(`Stop: ATR × ${CONFIG.atrMultiplier}`, 'info');
-  addLog(`✅ FASE 1: Trailing + ADX + Volume`, 'success');
-  addLog(`✅ FASE 2: Risco Dinâmico + Correlação + Sessions`, 'success');
-  addLog(`✅ FASE 3: SMC REAL + Dados Precisos`, 'success');
+  addLog(`TPs: ${CONFIG.tpFixed.tp1}% / ${CONFIG.tpFixed.tp2}% / ${CONFIG.tpFixed.tp3}%`, 'info');
+  addLog(`Stop por categoria (Blue Chip 4x | Alts 4.5x | Memecoin 5x)`, 'info');
+  addLog(`✅ V6.0: Day Trade + Filtro BTC + Tracking sem operação`, 'success');
   
-  await sendToPrivate(`🚀 BRUNO TRADER PRO V5.0 - SISTEMA COMPLETO
-
-━━━━━━━━━━━━━━━━━━
-
-✨ FASE 1 COMPLETA:
-
-📊 Trailing Stop Inteligente
-   - Breakeven em TP1
-   - Trailing em TP2
-   - Auto-close TP3
-
-⚡ ADX Filter (Min ${CONFIG.minADX})
-   - Evita laterais
-   - Bonus ADX > 30
-
-📈 Volume 24h Melhorado
-   - Análise 96 velas
-   - Spike detection
-
-━━━━━━━━━━━━━━━━━━
-
-🆕 FASE 2 IMPLEMENTADA:
-
-💰 RISCO DINÂMICO
-   - Normal: 2%
-   - Recovery: 1% (2+ losses)
-   - Boost: 3% (3+ wins)
-   - Emergency: 0.5% (DD > 10%)
-
-🎯 CORRELAÇÃO
-   - Max 1 trade/grupo/direção
-   - 6 grupos identificados
-   - Diversificação real
-
-🕐 SESSION FILTERS
-   - Premium: +10 score
-   - Dead zone: -20 score
-   - 3 sessões ativas
-
-━━━━━━━━━━━━━━━━━━
-
-🔥 FASE 3 IMPLEMENTADA:
-
-📊 SMC COM DADOS REAIS
-   - CHoCH real (não simulado)
-   - BOS real com confirmação
-   - Order Blocks c/ volume
-   - FVG validado (gap > 0.1%)
-   - Liquidity sweep detection
-
-✅ DETECÇÃO PRECISA
-   - Swing detection melhorado
-   - Confirmações em 3 velas
-   - Strength scoring real
-   - Zonas dinâmicas
-
-━━━━━━━━━━━━━━━━━━
-
-📈 SISTEMA BASE:
-
-✅ ${CONFIG.pairs.length} pares Binance.US
-✅ Multi-TF (15m/1h/4h)
-✅ Score min: ${CONFIG.minScore}/100
-✅ Stop: ATR × ${CONFIG.atrMultiplier}
-✅ Max Posições: ${CONFIG.maxPositions}
-✅ Max Exposição: ${CONFIG.maxExposure * 100}%
-
-━━━━━━━━━━━━━━━━━━
-
-🎯 IMPACTO ESPERADO:
-
-FASE 1+2: Win Rate 70-75%
-FASE 3: Win Rate 80-85% 🚀🚀
-Drawdown: -2 to -3%
-Sharpe: 2.5+
-Precisão SMC: +40%
-
-━━━━━━━━━━━━━━━━━━
-
-⏱ SISTEMA COMPLETO - V5.0
-📊 Monitoramento contínuo
-
-${new Date().toLocaleString('pt-BR')}`);
+  // Pega tendência inicial do BTC
+  const btcInitial = await getBTCTrend();
+  addLog(`📊 BTC inicial: ${btcInitial.direction} (${btcInitial.change.toFixed(2)}%)`, 'info');
   
-  setTimeout(() => { addLog('Primeira análise V5.0...', 'info'); analyzeMarket(); }, 10000);
+  await sendToPrivate(`🚀 BRUNO TRADER PRO V6.0 INICIADO
+
+━━━━━━━━━━━━━━━━━
+🎯 DAY TRADE PROFISSIONAL
+
+📊 CONFIGURAÇÃO:
+• Pares: ${CONFIG.pairs.length}
+• TP1: +${CONFIG.tpFixed.tp1}%
+• TP2: +${CONFIG.tpFixed.tp2}%
+• TP3: +${CONFIG.tpFixed.tp3}%
+• Stop: ATR × 4.0/4.5/5.0 (por categoria)
+• Score mínimo: ${CONFIG.minScore}/100
+
+🆕 NOVIDADES V6.0:
+✅ Filtro BTC (-25 score contra)
+✅ Stop por categoria
+✅ Setup Quality (estrelas)
+✅ Sistema de aprendizado
+✅ Tracking sem operação manual
+✅ Resumo diário (22h BR)
+✅ Alerta de volatilidade
+✅ Comando /status, /trade, /stats
+
+📊 BTC 4h: ${btcInitial.direction === 'up' ? '📈' : btcInitial.direction === 'down' ? '📉' : '➡️'} ${btcInitial.change.toFixed(2)}%
+
+━━━━━━━━━━━━━━━━━
+🎯 GESTÃO MANUAL (40/40/20):
+• 40% sai TP1
+• 40% sai TP2  
+• 20% runner TP3
+• Move stop pra entrada após TP1
+
+━━━━━━━━━━━━━━━━━
+⏱ SISTEMA INICIADO
+📅 ${formatBrazilDateTime()}`);
   
-  // Analisa mercado a cada 15 minutos (mantém qualidade)
+  setTimeout(() => { addLog('Primeira análise V6.0...', 'info'); analyzeMarket(); }, 10000);
+  
+  // 🆕 V6.0: Analisa mercado a cada 15 minutos
   setInterval(analyzeMarket, 900000);
   
-  // Checa resultados a cada 1 minuto (não perde TPs/Stops)
-  setInterval(checkTradeResults, 60000);
+  // 🆕 V6.0: Checa trades tracked (TPs/Stop/timeout) a cada 60s
+  setInterval(checkTrackedTrades, CONFIG.tradeTracking.checkInterval * 1000);
+  
+  // 🆕 V6.0: Checa volatilidade do BTC a cada 5 minutos
+  setInterval(checkAndAlertVolatility, 5 * 60 * 1000);
+  
+  // 🆕 V6.0: Atualiza tendência do BTC a cada 15 minutos
+  setInterval(getBTCTrend, 15 * 60 * 1000);
+  
+  // 🆕 V6.0: Resumo diário às 22h BR
+  setInterval(checkAndSendDailySummary, 60 * 1000); // checa a cada minuto
 });
+
+// 🆕 V6.0: COMANDOS TELEGRAM
+// =============================
+
+// Comando /status
+bot.onText(/\/status/, async (msg) => {
+  const chatId = msg.chat.id;
+  
+  const uptimeSeconds = process.uptime();
+  const uptimeHours = Math.floor(uptimeSeconds / 3600);
+  const uptimeMins = Math.floor((uptimeSeconds % 3600) / 60);
+  
+  const lastAnalysisMins = state.lastAnalysis ? 
+    Math.floor((Date.now() - new Date(state.lastAnalysis).getTime()) / 60000) : 
+    'N/A';
+  
+  const btcEmoji = state.btcStatus.direction === 'up' ? '📈' : 
+                   state.btcStatus.direction === 'down' ? '📉' : '➡️';
+  
+  const todayKey = new Date().toISOString().split('T')[0];
+  const signalsToday = state.signalsByDate[todayKey] || 0;
+  
+  const message = `🤖 BRUNO TRADER PRO V6.0
+
+✅ Status: Online
+⏰ Uptime: ${uptimeHours}h ${uptimeMins}min
+📡 Monitorando: ${CONFIG.pairs.length} pares
+🔄 Última análise: ${lastAnalysisMins}min atrás
+🎯 Sinais hoje: ${signalsToday}/5
+📊 BTC 4h: ${btcEmoji} ${state.btcStatus.change4h.toFixed(2)}%
+🟢 Trades acompanhando: ${state.trackedTrades.length}
+
+━━━━━━━━━━━━━━━━━
+📊 Estatísticas (manuais):
+🎯 Total: ${state.manualStats.total}
+🟢 Wins: ${state.manualStats.wins}
+🔴 Losses: ${state.manualStats.losses}
+🟡 Breakeven: ${state.manualStats.breakeven}
+📈 Win Rate: ${state.manualStats.winRate.toFixed(1)}%
+━━━━━━━━━━━━━━━━━
+🕐 ${formatBrazilDateTime()} (BR)`;
+
+  try {
+    await bot.sendMessage(chatId, message);
+  } catch (error) {
+    addLog(`Erro /status: ${error.message}`, 'error');
+  }
+});
+
+// Comando /trade SYMBOL win|loss|be [tp1|tp2|tp3]
+// Ex: /trade SOL win tp2
+//     /trade DOGE loss
+//     /trade ETH be
+bot.onText(/\/trade\s+(\S+)\s+(win|loss|be)(?:\s+(tp1|tp2|tp3))?/i, async (msg, match) => {
+  const chatId = msg.chat.id;
+  let symbol = match[1].toUpperCase();
+  const result = match[2].toLowerCase();
+  const tpLevel = match[3] ? match[3].toLowerCase() : null;
+  
+  // Adiciona USDT se não tiver
+  if (!symbol.endsWith('USDT')) symbol += 'USDT';
+  
+  // Registra trade manual
+  const manualTrade = {
+    symbol,
+    result,
+    tpLevel,
+    timestamp: new Date().toISOString()
+  };
+  
+  state.manualTrades.push(manualTrade);
+  state.manualStats.total++;
+  
+  let resultText = '';
+  if (result === 'win') {
+    state.manualStats.wins++;
+    if (tpLevel === 'tp1') state.manualStats.tp1Hits++;
+    else if (tpLevel === 'tp2') state.manualStats.tp2Hits++;
+    else if (tpLevel === 'tp3') state.manualStats.tp3Hits++;
+    resultText = `🟢 WIN ${tpLevel ? tpLevel.toUpperCase() : ''}`;
+  } else if (result === 'loss') {
+    state.manualStats.losses++;
+    resultText = '🔴 LOSS';
+  } else if (result === 'be') {
+    state.manualStats.breakeven++;
+    resultText = '🟡 BREAKEVEN';
+  }
+  
+  // Recalcula winRate
+  const decisive = state.manualStats.wins + state.manualStats.losses;
+  if (decisive > 0) {
+    state.manualStats.winRate = (state.manualStats.wins / decisive) * 100;
+  }
+  
+  // 🆕 V6.0: Atualiza aprendizado
+  if (CONFIG.btcFilter.enabled && state.learning.enabled) {
+    updateLearning(symbol, result);
+  }
+  
+  saveState();
+  
+  const message = `✅ Trade registrado!
+
+${resultText} - ${symbol}
+
+📊 Estatísticas:
+Total: ${state.manualStats.total}
+Wins: ${state.manualStats.wins}
+Losses: ${state.manualStats.losses}
+BE: ${state.manualStats.breakeven}
+Win Rate: ${state.manualStats.winRate.toFixed(1)}%`;
+  
+  try {
+    await bot.sendMessage(chatId, message);
+  } catch (error) {
+    addLog(`Erro /trade: ${error.message}`, 'error');
+  }
+});
+
+// Comando /stats - estatísticas detalhadas
+bot.onText(/\/stats/, async (msg) => {
+  const chatId = msg.chat.id;
+  
+  // Top 5 pares com mais trades
+  const symbolStats = Object.entries(state.learning.bySymbol)
+    .filter(([_, v]) => v.trades >= 2)
+    .sort((a, b) => b[1].trades - a[1].trades)
+    .slice(0, 5);
+  
+  let topSymbols = '';
+  if (symbolStats.length > 0) {
+    topSymbols = '\n\n📊 Top pares:\n' + symbolStats.map(([sym, s]) => 
+      `${sym}: ${s.wins}W/${s.losses}L (${s.winRate.toFixed(0)}%)`
+    ).join('\n');
+  }
+  
+  const message = `📊 ESTATÍSTICAS DETALHADAS
+
+🎯 Trades manuais: ${state.manualStats.total}
+🟢 Wins: ${state.manualStats.wins}
+🔴 Losses: ${state.manualStats.losses}
+🟡 Breakeven: ${state.manualStats.breakeven}
+
+📈 Distribuição TPs:
+TP1: ${state.manualStats.tp1Hits}
+TP2: ${state.manualStats.tp2Hits}
+TP3: ${state.manualStats.tp3Hits}
+
+📊 Win Rate: ${state.manualStats.winRate.toFixed(1)}%${topSymbols}`;
+  
+  try {
+    await bot.sendMessage(chatId, message);
+  } catch (error) {
+    addLog(`Erro /stats: ${error.message}`, 'error');
+  }
+});
+
+// Comando /help
+bot.onText(/\/help|\/start/, async (msg) => {
+  const chatId = msg.chat.id;
+  
+  const message = `🤖 BRUNO TRADER PRO V6.0
+
+📋 Comandos disponíveis:
+
+/status - Status atual do bot
+/stats - Estatísticas detalhadas
+/trade SYMBOL win|loss|be [tp]
+   Ex: /trade SOL win tp2
+   Ex: /trade DOGE loss
+   Ex: /trade ETH be
+/help - Esta mensagem
+
+🎯 Como usar:
+1. Recebe sinal no grupo
+2. Você decide se opera
+3. Quando fechar, marque com /trade
+4. Use /stats para ver desempenho
+
+📊 Bot Day Trade Profissional V6.0`;
+  
+  try {
+    await bot.sendMessage(chatId, message);
+  } catch (error) {
+    addLog(`Erro /help: ${error.message}`, 'error');
+  }
+});
+
+// 🆕 V6.0: RESUMO DIÁRIO
+// =============================
+
+let lastDailySummaryDate = null;
+
+async function checkAndSendDailySummary() {
+  if (!CONFIG.dailySummary.enabled) return;
+  
+  // Pega hora atual em Brasília
+  const now = new Date();
+  const brazilHour = parseInt(now.toLocaleString('en-US', { 
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    hour12: false
+  }));
+  
+  const todayKey = formatBrazilDate();
+  
+  // Só envia uma vez por dia, na hora configurada
+  if (brazilHour === CONFIG.dailySummary.hour && lastDailySummaryDate !== todayKey) {
+    await sendDailySummary();
+    lastDailySummaryDate = todayKey;
+  }
+}
+
+async function sendDailySummary() {
+  try {
+    const todayKey = new Date().toISOString().split('T')[0];
+    const signalsToday = state.signalsByDate[todayKey] || 0;
+    
+    // Conta sinais por par hoje
+    const signalsBySymbol = {};
+    state.signals
+      .filter(s => s.timestamp && s.timestamp.startsWith(todayKey))
+      .forEach(s => {
+        signalsBySymbol[s.symbol] = (signalsBySymbol[s.symbol] || 0) + 1;
+      });
+    
+    const topPairs = Object.entries(signalsBySymbol)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([sym, count]) => `   • ${sym}: ${count} sinais`)
+      .join('\n');
+    
+    // Trades manuais hoje
+    const manualToday = state.manualTrades.filter(t => 
+      t.timestamp && t.timestamp.startsWith(todayKey)
+    );
+    const winsToday = manualToday.filter(t => t.result === 'win').length;
+    const lossesToday = manualToday.filter(t => t.result === 'loss').length;
+    
+    // BTC
+    const btcEmoji = state.btcStatus.direction === 'up' ? '📈' : 
+                     state.btcStatus.direction === 'down' ? '📉' : '➡️';
+    
+    const message = `📊 RESUMO DO DIA - ${formatBrazilDate()}
+
+🔍 Análises: ${state.analysisCount} ciclos
+🎯 Sinais gerados hoje: ${signalsToday}
+
+${topPairs ? `🌟 Pares mais ativos:\n${topPairs}\n` : ''}
+
+📊 Trades manuais hoje:
+🟢 Wins: ${winsToday}
+🔴 Losses: ${lossesToday}
+
+📊 BTC do dia: ${btcEmoji} ${state.btcStatus.change4h.toFixed(2)}%
+
+💪 Próxima análise: 00:00
+Boa noite! 🌙`;
+    
+    await sendToPrivate(message);
+    addLog('📊 Resumo diário enviado', 'success');
+  } catch (error) {
+    addLog(`Erro resumo diário: ${error.message}`, 'error');
+  }
+}
 
 process.on('unhandledRejection', (error) => { addLog(`Erro: ${error.message}`, 'error'); });
