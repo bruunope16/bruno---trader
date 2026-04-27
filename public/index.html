@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bruno Trader Pro V5.0 - Terminal</title>
+    <title>Bruno Trader Pro V6.0 - Day Trade Terminal</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -802,7 +802,7 @@
                 </div>
                 <div class="logo-text">
                     <div class="logo-title">BRUNO TRADER</div>
-                    <div class="logo-subtitle">CRIPTO FUTUROS</div>
+                    <div class="logo-subtitle">DAY TRADE V6.0</div>
                 </div>
             </div>
             
@@ -842,7 +842,7 @@
     </div>
 
     <div class="container">
-        <!-- Stats Grid Principal -->
+        <!-- 🆕 V6.0: Stats Grid Principal -->
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-header">
@@ -853,88 +853,88 @@
             </div>
             <div class="stat-card">
                 <div class="stat-header">
-                    <span class="stat-label">Sinais</span>
+                    <span class="stat-label">Sinais Hoje</span>
                     <span class="stat-icon">🎯</span>
                 </div>
                 <div class="stat-value" id="stat-signals">0</div>
             </div>
             <div class="stat-card">
                 <div class="stat-header">
-                    <span class="stat-label">Win Rate</span>
-                    <span class="stat-icon">📈</span>
+                    <span class="stat-label">Acompanhando</span>
+                    <span class="stat-icon">📡</span>
                 </div>
-                <div class="stat-value" id="stat-winrate">0%</div>
+                <div class="stat-value" id="stat-tracked" style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">0</div>
             </div>
             <div class="stat-card">
                 <div class="stat-header">
-                    <span class="stat-label">Balance</span>
-                    <span class="stat-icon">💰</span>
+                    <span class="stat-label">Pares</span>
+                    <span class="stat-icon">📈</span>
                 </div>
-                <div class="stat-value" id="stat-balance">$1000</div>
+                <div class="stat-value" id="stat-pairs">33</div>
             </div>
         </div>
 
-        <!-- Estatísticas Hoje -->
-        <div class="today-stats">
-            <div class="today-title">📈 Estatísticas Gerais</div>
-            <div class="today-grid">
+        <!-- 🆕 V6.0: Status do BTC -->
+        <div class="today-stats" style="border: 1px solid var(--accent-gold);">
+            <div class="today-title">₿ Status do Bitcoin (Filtro Master)</div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; padding: 10px;">
                 <div class="today-item">
-                    <div class="today-item-label">Sinais Totais</div>
-                    <div class="today-item-value" id="today-signals">0</div>
+                    <div class="today-item-label">Direção 4h</div>
+                    <div class="today-item-value" id="btc-direction" style="font-size: 18px;">--</div>
                 </div>
                 <div class="today-item">
-                    <div class="today-item-label">Trades Pendentes</div>
-                    <div class="today-item-value today-gold" id="today-active">0</div>
+                    <div class="today-item-label">Mudança 4h</div>
+                    <div class="today-item-value" id="btc-change" style="font-size: 18px;">0.00%</div>
+                </div>
+                <div class="today-item">
+                    <div class="today-item-label">Última Atualização</div>
+                    <div class="today-item-value" id="btc-update" style="font-size: 14px;">--</div>
+                </div>
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); text-align: center; padding: 10px; border-top: 1px solid var(--border-color); margin-top: 10px;">
+                💡 Sinais contra direção do BTC perdem -25 pontos no score
+            </div>
+        </div>
+
+        <!-- 🆕 V6.0: Estatísticas Manuais (você marca via /trade) -->
+        <div class="today-stats">
+            <div class="today-title">📊 Seus Trades Manuais (via /trade)</div>
+            <div class="today-grid">
+                <div class="today-item">
+                    <div class="today-item-label">Total</div>
+                    <div class="today-item-value" id="manual-total">0</div>
                 </div>
                 <div class="today-item">
                     <div class="today-item-label">Wins</div>
-                    <div class="today-item-value today-green" id="today-wins">0</div>
+                    <div class="today-item-value today-green" id="manual-wins">0</div>
                 </div>
                 <div class="today-item">
                     <div class="today-item-label">Losses</div>
-                    <div class="today-item-value today-red" id="today-losses">0</div>
+                    <div class="today-item-value today-red" id="manual-losses">0</div>
                 </div>
                 <div class="today-item">
-                    <div class="today-item-label">Consecutivos Win</div>
-                    <div class="today-item-value today-green" id="consec-wins">0</div>
+                    <div class="today-item-label">Breakeven</div>
+                    <div class="today-item-value today-gold" id="manual-be">0</div>
                 </div>
                 <div class="today-item">
-                    <div class="today-item-label">Consecutivos Loss</div>
-                    <div class="today-item-value today-red" id="consec-losses">0</div>
+                    <div class="today-item-label">Win Rate</div>
+                    <div class="today-item-value today-green" id="manual-winrate">0%</div>
                 </div>
                 <div class="today-item">
-                    <div class="today-item-label">Drawdown Máx</div>
-                    <div class="today-item-value today-red" id="max-drawdown">0%</div>
+                    <div class="today-item-label">TP1 Hits</div>
+                    <div class="today-item-value today-blue" id="manual-tp1">0</div>
                 </div>
                 <div class="today-item">
-                    <div class="today-item-label">Profit Total</div>
-                    <div class="today-item-value today-green" id="total-profit">$0</div>
+                    <div class="today-item-label">TP2 Hits</div>
+                    <div class="today-item-value today-blue" id="manual-tp2">0</div>
+                </div>
+                <div class="today-item">
+                    <div class="today-item-label">TP3 Hits</div>
+                    <div class="today-item-value today-green" id="manual-tp3">0</div>
                 </div>
             </div>
-        </div>
-
-        <!-- Performance Detalhada (NOVO - usa /api/stats) -->
-        <div class="performance-section">
-            <div class="performance-title">🎯 Performance Detalhada</div>
-            <div class="performance-grid">
-                <div class="perf-item">
-                    <div class="perf-label">Profit Factor</div>
-                    <div class="perf-value" id="profit-factor">N/A</div>
-                    <div class="perf-subtitle">Lucros ÷ Perdas (>1.5 = bom)</div>
-                </div>
-                <div class="perf-item">
-                    <div class="perf-label">Avg Win</div>
-                    <div class="perf-value" id="avg-win" style="color: var(--accent-green);">N/A</div>
-                    <div class="perf-subtitle">Lucro médio por trade ganho</div>
-                </div>
-                <div class="perf-item">
-                    <div class="perf-label">Avg Loss</div>
-                    <div class="perf-value" id="avg-loss" style="color: var(--accent-red);">N/A</div>
-                    <div class="perf-subtitle">Perda média por trade perdido</div>
-                </div>
-            </div>
-            <div style="font-size: 12px; color: var(--text-secondary); text-align: center; padding-top: 10px; border-top: 1px solid var(--border-color);">
-                📊 Endpoint <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; color: var(--accent-cyan);">/api/stats</code> - Dados detalhados disponíveis (win rate por par, hora, faixa de score)
+            <div style="font-size: 12px; color: var(--text-secondary); text-align: center; padding-top: 10px; border-top: 1px solid var(--border-color); margin-top: 10px;">
+                💡 Use <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; color: var(--accent-cyan);">/trade SYMBOL win|loss|be [tp]</code> no Telegram para registrar resultados
             </div>
         </div>
 
@@ -957,7 +957,7 @@
         <div class="signals-section">
             <div class="section-title">
                 <span>🚀</span>
-                <span>Últimos Sinais</span>
+                <span>Sinais (Acompanhamento)</span>
             </div>
             <div class="signals-scroll" id="signals-container">
                 <div class="loading">
@@ -1214,17 +1214,22 @@
                     updateLastAnalysisTime();
                 }
                 
-                // Stats principais
+                // 🆕 V6.0: Stats principais
                 document.getElementById('stat-analysis').textContent = status.analysisCount || 0;
-                document.getElementById('stat-signals').textContent = status.signalsCount || 0;
-                document.getElementById('stat-winrate').textContent = (status.stats?.winRate || 0) + '%';
-                document.getElementById('stat-balance').textContent = '$' + (status.balance || 1000).toFixed(2);
+                
+                const todaySignals = status.todaySignals !== undefined ? status.todaySignals : (status.signalsCount || 0);
+                document.getElementById('stat-signals').textContent = todaySignals;
+                
+                document.getElementById('stat-tracked').textContent = status.trackedTrades || 0;
+                document.getElementById('stat-pairs').textContent = status.config?.pairs || 33;
                 
                 // Modo de risco
                 const riskMode = status.riskMode || 'normal';
                 const riskBadge = document.getElementById('risk-mode');
-                riskBadge.textContent = riskMode.toUpperCase();
-                riskBadge.className = 'risk-mode-badge ' + getRiskModeClass(riskMode);
+                if (riskBadge) {
+                    riskBadge.textContent = riskMode.toUpperCase();
+                    riskBadge.className = 'risk-mode-badge ' + getRiskModeClass(riskMode);
+                }
                 
                 // Uptime
                 const uptimeSec = status.uptime || 0;
@@ -1240,20 +1245,48 @@
                 }
                 document.getElementById('bot-uptime').textContent = uptimeText;
                 
-                // Estatísticas gerais
-                document.getElementById('today-signals').textContent = status.signalsCount || 0;
-                document.getElementById('today-active').textContent = status.pendingTrades || 0;
-                document.getElementById('today-wins').textContent = status.stats?.wins || 0;
-                document.getElementById('today-losses').textContent = status.stats?.losses || 0;
-                document.getElementById('consec-wins').textContent = status.stats?.consecutiveWins || 0;
-                document.getElementById('consec-losses').textContent = status.stats?.consecutiveLosses || 0;
-                document.getElementById('max-drawdown').textContent = 
-                    ((status.stats?.maxDrawdown || 0) * 100).toFixed(1) + '%';
+                // 🆕 V6.0: Status BTC
+                if (status.btcStatus) {
+                    const btc = status.btcStatus;
+                    const btcDirEl = document.getElementById('btc-direction');
+                    const btcChangeEl = document.getElementById('btc-change');
+                    const btcUpdateEl = document.getElementById('btc-update');
+                    
+                    if (btcDirEl) {
+                        let dirText = '';
+                        let dirColor = 'var(--text-secondary)';
+                        if (btc.direction === 'up') { dirText = '📈 ALTA'; dirColor = 'var(--accent-green)'; }
+                        else if (btc.direction === 'down') { dirText = '📉 BAIXA'; dirColor = 'var(--accent-red)'; }
+                        else if (btc.direction === 'lateral') { dirText = '➡️ LATERAL'; dirColor = 'var(--accent-gold)'; }
+                        else { dirText = '❓ N/A'; }
+                        btcDirEl.textContent = dirText;
+                        btcDirEl.style.color = dirColor;
+                    }
+                    
+                    if (btcChangeEl) {
+                        const change = btc.change4h || 0;
+                        btcChangeEl.textContent = (change > 0 ? '+' : '') + change.toFixed(2) + '%';
+                        btcChangeEl.style.color = change > 0 ? 'var(--accent-green)' : (change < 0 ? 'var(--accent-red)' : 'var(--text-secondary)');
+                    }
+                    
+                    if (btcUpdateEl && btc.lastUpdate) {
+                        const updateMin = Math.floor((Date.now() - new Date(btc.lastUpdate).getTime()) / 60000);
+                        btcUpdateEl.textContent = updateMin + 'min atrás';
+                    }
+                }
                 
-                const totalProfit = status.stats?.totalProfit || 0;
-                const profitEl = document.getElementById('total-profit');
-                profitEl.textContent = (totalProfit >= 0 ? '+' : '') + '$' + totalProfit.toFixed(2);
-                profitEl.className = 'today-item-value ' + (totalProfit >= 0 ? 'today-green' : 'today-red');
+                // 🆕 V6.0: Stats Manuais
+                if (status.manualStats) {
+                    const m = status.manualStats;
+                    document.getElementById('manual-total').textContent = m.total || 0;
+                    document.getElementById('manual-wins').textContent = m.wins || 0;
+                    document.getElementById('manual-losses').textContent = m.losses || 0;
+                    document.getElementById('manual-be').textContent = m.breakeven || 0;
+                    document.getElementById('manual-winrate').textContent = (m.winRate || 0).toFixed(1) + '%';
+                    document.getElementById('manual-tp1').textContent = m.tp1Hits || 0;
+                    document.getElementById('manual-tp2').textContent = m.tp2Hits || 0;
+                    document.getElementById('manual-tp3').textContent = m.tp3Hits || 0;
+                }
                 
                 // Sinais
                 const signalsRes = await fetch('/api/signals');
@@ -1298,25 +1331,6 @@
                     renderLogs();
                 }
                 
-                // Busca stats detalhados se houver trades
-                if (status.stats && status.stats.totalTrades > 0) {
-                    try {
-                        const statsRes = await fetch('/api/stats');
-                        const statsData = await statsRes.json();
-                        
-                        if (statsData.geral) {
-                            document.getElementById('profit-factor').textContent = 
-                                statsData.geral.profitFactor || 'N/A';
-                            document.getElementById('avg-win').textContent = 
-                                statsData.geral.avgWin || 'N/A';
-                            document.getElementById('avg-loss').textContent = 
-                                statsData.geral.avgLoss || 'N/A';
-                        }
-                    } catch (e) {
-                        // /api/stats pode não estar disponível ainda
-                    }
-                }
-                
             } catch (error) {
                 console.error('Erro:', error);
                 document.getElementById('bot-status').textContent = 'Erro de conexão';
@@ -1328,25 +1342,51 @@
             const html = signals.map(signal => {
                 const score = signal.score || 0;
                 const direction = (signal.direction || '').toLowerCase();
-                const status = signal.status || 'active';
+                const status = signal.status || 'tracking';
                 
                 const signalDate = new Date(signal.timestamp);
-                const timeStr = signalDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                const dateStr = signalDate.toLocaleDateString('pt-BR');
+                const timeStr = signalDate.toLocaleTimeString('pt-BR', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    timeZone: 'America/Sao_Paulo'
+                });
+                const dateStr = signalDate.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
                 
-                const statusBadge = status === 'pending_entry' 
-                    ? '<span class="signal-status-badge status-pending">⏳ AGUARDANDO</span>'
-                    : '<span class="signal-status-badge status-active">✅ ATIVO</span>';
+                // 🆕 V6.0: Status badge atualizado
+                let statusBadge;
+                if (status === 'tracking') {
+                    statusBadge = '<span class="signal-status-badge status-active">📡 ACOMPANHANDO</span>';
+                } else if (status === 'pending_entry') {
+                    statusBadge = '<span class="signal-status-badge status-pending">⏳ AGUARDANDO</span>';
+                } else {
+                    statusBadge = '<span class="signal-status-badge status-active">✅ ATIVO</span>';
+                }
                 
-                const pendingClass = status === 'pending_entry' ? 'pending' : '';
+                // 🆕 V6.0: Setup Quality (estrelas)
+                const setupVisual = signal.setupVisual || '';
+                const setupLabel = signal.setupLabel || '';
+                const setupHTML = setupVisual ? `<div style="text-align: center; padding: 8px; font-size: 16px; color: var(--accent-gold); border-bottom: 1px solid var(--border-color); margin-bottom: 10px;">${setupVisual} ${setupLabel}</div>` : '';
+                
+                // 🆕 V6.0: BTC alignment indicator
+                let btcBadge = '';
+                if (signal.btcAlignment === 'aligned') {
+                    btcBadge = '<span style="background: rgba(16, 185, 129, 0.2); color: var(--accent-green); padding: 2px 8px; border-radius: 4px; font-size: 11px;">✅ BTC ALINHADO</span>';
+                } else if (signal.btcAlignment === 'against') {
+                    btcBadge = '<span style="background: rgba(239, 68, 68, 0.2); color: var(--accent-red); padding: 2px 8px; border-radius: 4px; font-size: 11px;">⚠️ BTC CONTRA</span>';
+                } else if (signal.btcAlignment === 'self') {
+                    btcBadge = '<span style="background: rgba(251, 191, 36, 0.2); color: var(--accent-gold); padding: 2px 8px; border-radius: 4px; font-size: 11px;">⭐ BTC/ETH/BNB</span>';
+                }
                 
                 return `
-                    <div class="signal-card ${direction} ${pendingClass}">
+                    <div class="signal-card ${direction}">
                         ${statusBadge}
+                        ${setupHTML}
                         <div class="signal-header">
                             <div class="signal-symbol">${signal.symbol}</div>
                             <div class="signal-direction ${direction}">${signal.direction}</div>
                         </div>
+                        
+                        ${btcBadge ? `<div style="margin-bottom: 10px;">${btcBadge}</div>` : ''}
                         
                         <div class="signal-details">
                             <div class="signal-detail">
@@ -1358,11 +1398,11 @@
                                 <div class="signal-detail-value red">$${signal.stopLoss}</div>
                             </div>
                             <div class="signal-detail">
-                                <div class="signal-detail-label">TP1</div>
+                                <div class="signal-detail-label">TP1 (+0.7%)</div>
                                 <div class="signal-detail-value green">$${signal.tp1}</div>
                             </div>
                             <div class="signal-detail">
-                                <div class="signal-detail-label">TP3</div>
+                                <div class="signal-detail-label">TP3 (+2.5%)</div>
                                 <div class="signal-detail-value green">$${signal.tp3}</div>
                             </div>
                             <div class="signal-detail">
@@ -1386,6 +1426,12 @@
                         <div class="signal-score-bar">
                             <div class="signal-score-fill" style="width: ${score}%"></div>
                         </div>
+                        
+                        ${signal.categoryLabel ? `
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+                                ${signal.categoryLabel} | Stop ATR×${signal.atrMultiplier || 'N/A'}
+                            </div>
+                        ` : ''}
                         
                         ${signal.confluences ? `
                             <div class="signal-confluences">
