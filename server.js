@@ -34,7 +34,22 @@ console.log(`📱 Telegram configurado:`);
 console.log(`   Privado (Bruno): ${CHAT_ID}`);
 console.log(`   Grupo (Bruno+Pai): ${GROUP_ID}`);
 
-const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: false });
+const bot = new TelegramBot(TELEGRAM_TOKEN, { 
+  polling: {
+    interval: 1000,        // verifica novas mensagens a cada 1 segundo
+    autoStart: true,
+    params: {
+      timeout: 10
+    }
+  }
+});
+
+// Tratamento de erros do polling
+bot.on('polling_error', (error) => {
+  console.error('❌ Polling error:', error.message);
+});
+
+console.log(`✅ Bot Telegram em modo POLLING (recebe comandos /status, /trade, etc)`);
 
 const CONFIG = {
   riskPerTrade: 0.02,
@@ -1247,44 +1262,167 @@ function analyzeVolume(candles) {
   const volumes = candles.map(c => c.volume);
   
   // 🔧 FIX CRÍTICO: Ignora a ÚLTIMA vela (pode estar ABERTA com volume parcial)
-  // A API da Binance retorna o candle atual mesmo não fechado
-  // Isso causava volume 0.00x pois a vela atual tinha só alguns minutos de dados
-  const fechadas = volumes.slice(0, -1); // Remove a última (pode estar aberta)
+  const fechadas = volumes.slice(0, -1);
   
   // Pega últimas 96 velas FECHADAS para média de 24h
   const last96 = fechadas.slice(-96);
   const numVelas = last96.length;
   
   if (numVelas < 10) {
-    return { current: 0, average: 0, ratio: 0, spike: false, increasing: false };
+    return { 
+      current: 0, average: 0, ratio: 0, spike: false, increasing: false,
+      pattern: 'insufficient_data',
+      patternLabel: '⚠️ Dados insuficientes',
+      patternScore: 0,
+      patternValid: false,
+      patternReason: 'Menos de 10 velas',
+      ratios: []
+    };
   }
   
   // Volume médio 24h (96 velas fechadas de 15min = 24h)
   const avgVolume24h = last96.reduce((a, b) => a + b, 0) / numVelas;
   
-  // 🔧 FIX: Usa a ÚLTIMA VELA FECHADA (não a aberta atual)
-  const currentVolume = fechadas[fechadas.length - 1];
+  // Pega últimos 4 candles fechados para análise contextual
+  const last4 = fechadas.slice(-4);
   
-  // 🔧 FIX: Evita divisão por zero
-  const ratio = avgVolume24h > 0 ? currentVolume / avgVolume24h : 0;
+  // Calcula ratios (mais antigo → mais novo)
+  const ratios = last4.map(v => avgVolume24h > 0 ? v / avgVolume24h : 0);
   
-  // Volume Spike (> 2x média)
-  const spike = ratio > 2.0;
+  // Garante que temos 4 ratios (preenche com 0 se faltar)
+  while (ratios.length < 4) ratios.unshift(0);
   
-  // Volume crescente (últimas 3 velas FECHADAS)
-  const last3Vol = fechadas.slice(-3);
-  const increasing = last3Vol.length === 3 && 
-                     last3Vol[2] > last3Vol[1] && 
-                     last3Vol[1] > last3Vol[0];
+  const [r3, r2, r1, r0] = ratios; // r0 = mais recente
+  
+  // 🆕 V6.1: ANÁLISE DE PADRÃO PROFISSIONAL
+  const pattern = detectVolumePattern(r3, r2, r1, r0);
   
   return { 
-    current: currentVolume, 
+    current: last4[last4.length - 1] || 0, 
     average: avgVolume24h, 
-    ratio, 
-    spike, 
-    increasing 
+    ratio: r0,                    // mantém compatibilidade
+    spike: r0 > 2.0 || r1 > 2.0,
+    increasing: r3 < r2 && r2 < r1 && r1 < r0,
+    // 🆕 V6.1: Novos campos
+    ratios: ratios,
+    pattern: pattern.pattern,
+    patternLabel: pattern.label,
+    patternScore: pattern.score,
+    patternValid: pattern.valid,
+    patternReason: pattern.reason
   };
 }
+
+// 🆕 V6.1: DETECÇÃO DE PADRÃO PROFISSIONAL DE VOLUME
+function detectVolumePattern(r3, r2, r1, r0) {
+  // r0 = mais recente, r3 = mais antigo
+  
+  // 🚨 CRESCENTE SUSTENTADO - Acumulação saudável
+  if (r3 < r2 && r2 < r1 && r1 < r0 && r0 >= 1.2) {
+    return {
+      pattern: 'crescent',
+      label: '📈 Volume Crescente',
+      score: 20,
+      valid: true,
+      reason: `Acumulação: ${r3.toFixed(1)}→${r2.toFixed(1)}→${r1.toFixed(1)}→${r0.toFixed(1)}x`
+    };
+  }
+  
+  // 💥 SPIKE + CONTINUIDADE - Movimento institucional
+  // Spike grande seguido de volume sustentado (não morre)
+  const hadSpike = r1 > 2.5 || r2 > 2.5;
+  if (hadSpike && r0 >= 1.3 && r0 >= r1 * 0.5) {
+    return {
+      pattern: 'spike_continuity',
+      label: '💥 Spike + Continuidade',
+      score: 18,
+      valid: true,
+      reason: `Spike ${Math.max(r1,r2).toFixed(1)}x + continuidade ${r0.toFixed(1)}x`
+    };
+  }
+  
+  // ⚠️ SPIKE + EXAUSTÃO - PEGADINHA! Volume morreu após spike
+  // Tinha spike forte e agora morreu drasticamente
+  if (hadSpike && r0 < 0.9) {
+    return {
+      pattern: 'spike_exhaustion',
+      label: '⚠️ Spike + Exaustão',
+      score: -15,
+      valid: false,
+      reason: `Spike ${Math.max(r1,r2).toFixed(1)}x mas morreu (${r0.toFixed(1)}x)`
+    };
+  }
+  
+  // 🌊 MÉDIA CONSISTENTE - Interesse contínuo
+  // Volume sustentado acima da média sem grande variação
+  const avg3 = (r0 + r1 + r2) / 3;
+  const maxR = Math.max(r0, r1, r2);
+  const minR = Math.min(r0, r1, r2);
+  const isSustained = avg3 >= 1.15 && (maxR - minR) < 0.6;
+  
+  if (isSustained) {
+    return {
+      pattern: 'sustained',
+      label: '🌊 Volume Consistente',
+      score: 12,
+      valid: true,
+      reason: `Média 3 velas: ${avg3.toFixed(2)}x sustentado`
+    };
+  }
+  
+  // 📉 DECRESCENTE - Movimento perdendo força
+  if (r3 > r2 && r2 > r1 && r1 > r0 && r3 > 1.5) {
+    return {
+      pattern: 'decrescent',
+      label: '📉 Volume Decrescente',
+      score: -8,
+      valid: false,
+      reason: `Esfriando: ${r3.toFixed(1)}→${r2.toFixed(1)}→${r1.toFixed(1)}→${r0.toFixed(1)}x`
+    };
+  }
+  
+  // 💀 VOLUME MORTO - Sem interesse
+  if (avg3 < 0.9) {
+    return {
+      pattern: 'dead',
+      label: '💀 Volume Morto',
+      score: -12,
+      valid: false,
+      reason: `Sem interesse (média ${avg3.toFixed(2)}x)`
+    };
+  }
+  
+  // ✅ SPIKE ISOLADO - Volume só na vela atual (suspeito)
+  if (r0 > 2.0 && r1 < 1.0 && r2 < 1.0) {
+    return {
+      pattern: 'isolated_spike',
+      label: '⚡ Spike Isolado',
+      score: 5,  // pode ser bom mas requer confirmação
+      valid: true,
+      reason: `Spike ${r0.toFixed(1)}x sem contexto anterior`
+    };
+  }
+  
+  // ✅ VOLUME OK SIMPLES - Atual acima da média (mantém compatibilidade)
+  if (r0 >= 1.2) {
+    return {
+      pattern: 'simple_ok',
+      label: '✅ Volume OK',
+      score: 8,
+      valid: true,
+      reason: `Atual ${r0.toFixed(2)}x média`
+    };
+  }
+  
+  // ❌ VOLUME BAIXO - Não atende mínimo
+  return {
+    pattern: 'low',
+    label: '❌ Volume Baixo',
+    score: -5,
+    valid: false,
+    reason: `Atual ${r0.toFixed(2)}x < 1.2x mínimo`
+  };
+} 
 
 function detectSR(candles) {
   const currentPrice = candles[candles.length - 1].close;
@@ -1348,7 +1486,20 @@ async function analyzeSymbol(symbol) {
     
     const volume = analyzeVolume(candles15m);
     
-    // 🆕 FASE 1: FILTRO VOLUME - Rejeita volume baixo
+    // 🆕 V6.1: FILTRO PADRÃO VOLUME - rejeita padrões problemáticos
+    // Padrões inválidos: spike_exhaustion, decrescent, dead, low
+    if (!volume.patternValid && volume.pattern !== 'insufficient_data') {
+      return {
+        valid: false,
+        reason: `Volume: ${volume.patternLabel} - ${volume.patternReason}`,
+        volumeRatio: volume.ratio.toFixed(2),
+        volumePattern: volume.pattern,
+        adx: ind15m.adx.toFixed(1),
+        direction: structure15m.trend === 'bullish' ? 'LONG' : 'SHORT'
+      };
+    }
+    
+    // 🆕 FASE 1: FILTRO VOLUME (mantém compatibilidade) - Rejeita volume muito baixo
     if (volume.ratio < CONFIG.volumeMultiplier) {
       return { 
         valid: false, 
@@ -1434,9 +1585,16 @@ async function analyzeSymbol(symbol) {
     
     if (sr) { confluences.push('S/R'); score += CONFIG.scoreWeights.sr; }
     
-    if (volume.spike && volume.increasing) { 
-      confluences.push('Volume Spike'); 
-      score += CONFIG.scoreWeights.volumeSpike; 
+    // 🆕 V6.1: PADRÃO DE VOLUME PROFISSIONAL
+    // Substitui análise simples por detecção de 8 padrões diferentes
+    if (volume.pattern && volume.pattern !== 'insufficient_data') {
+      confluences.push(volume.patternLabel);
+      score += volume.patternScore;
+      
+      // Log do padrão para debug (opcional)
+      if (volume.patternScore !== 0) {
+        addLog(`📊 ${symbol}: ${volume.patternLabel} (${volume.patternScore > 0 ? '+' : ''}${volume.patternScore} pts)`, 'info');
+      }
     }
     
     // 🆕 FASE 1: BONUS ADX Forte (> 30)
@@ -1445,8 +1603,9 @@ async function analyzeSymbol(symbol) {
       score += CONFIG.scoreWeights.adxBonus;
     }
     
-    // 🆕 FASE 1: BONUS Volume Spike Extremo (> 2.5x)
-    if (volume.ratio > 2.5) {
+    // 🆕 V6.1: BONUS Volume Extremo apenas se padrão for VÁLIDO
+    // (evita pontuar spike + exaustão como bom)
+    if (volume.ratio > 2.5 && volume.patternValid) {
       confluences.push(`Volume Extremo (${volume.ratio.toFixed(1)}x)`);
       score += 5;
     }
@@ -1624,6 +1783,11 @@ async function analyzeSymbol(symbol) {
       setupQuality: setupQuality.stars,
       setupVisual: setupQuality.visual,
       setupLabel: setupQuality.label,
+      // 🆕 V6.1: Padrão de volume
+      volumePattern: volume.pattern,
+      volumePatternLabel: volume.patternLabel,
+      volumePatternScore: volume.patternScore,
+      volumeRatios: volume.ratios.map(r => r.toFixed(2)),
       // Tracking
       reachedTP1: false,
       reachedTP2: false,
@@ -1804,7 +1968,7 @@ async function analyzeMarket() {
         confluencesText = confluencesText.substring(0, 497) + '...';
       }
       
-      const message = `🚨 DAY TRADE SIGNAL V6.0 | ${signal.symbol}
+      const message = `🚨 DAY TRADE SIGNAL V6.1 | ${signal.symbol}
 
 📈 Direção: ${signal.direction}
 ⚡ Alavancagem: ${CONFIG.leverage}x
@@ -1829,6 +1993,7 @@ ${signal.setupVisual} ${signal.setupLabel}
 
 📊 Tendência: ${trendText}
 📈 Volume: ${volumeText} (${signal.volumeRatio}x)
+${signal.volumePatternLabel ? `🔍 Padrão Vol: ${signal.volumePatternLabel}\n📊 Sequência: ${signal.volumeRatios ? signal.volumeRatios.join('→') + 'x' : 'N/A'}` : ''}
 ⚡ Força: ${forceText}
 🔥 Volatilidade: Média/Alta
 🎯 Score: ${signal.score}/100
@@ -1847,7 +2012,7 @@ ${confluencesText}
 ━━━━━━━━━━━━━━━━━━
 📡 Exchange: Binance Futures
 ⏱ Timeframe: 15m
-📊 Tipo: Day Trade Profissional V6.0
+📊 Tipo: Day Trade Profissional V6.1
 ⏳ Duração Estimada: 2h — 8h
 ━━━━━━━━━━━━━━━━━
 📅 Data: ${formatBrazilDate()}
@@ -2083,7 +2248,7 @@ app.get('/api/status', (req, res) => {
     
     riskMode: state.riskMode,
     config: {
-      style: 'Day Trade Profissional V6.0', 
+      style: 'Day Trade Profissional V6.1', 
       timeframes: '15m + 1h + 4h + BTC 4h',
       minScore: CONFIG.minScore, 
       pairs: CONFIG.pairs.length,
@@ -2245,19 +2410,19 @@ app.get('/health', (req, res) => res.send('OK'));
 
 app.listen(PORT, async () => {
   addLog('========================================', 'success');
-  addLog('BRUNO TRADER PRO V6.0 - DAY TRADE PROFISSIONAL', 'success');
+  addLog('BRUNO TRADER PRO V6.1 - DAY TRADE PROFISSIONAL', 'success');
   addLog('========================================', 'success');
   addLog(`Pares: ${CONFIG.pairs.length}`, 'info');
   addLog(`Score mínimo: ${CONFIG.minScore}/100`, 'info');
   addLog(`TPs: ${CONFIG.tpFixed.tp1}% / ${CONFIG.tpFixed.tp2}% / ${CONFIG.tpFixed.tp3}%`, 'info');
   addLog(`Stop por categoria (Blue Chip 4x | Alts 4.5x | Memecoin 5x)`, 'info');
-  addLog(`✅ V6.0: Day Trade + Filtro BTC + Tracking sem operação`, 'success');
+  addLog(`✅ V6.1: Day Trade + Filtro BTC + Tracking sem operação`, 'success');
   
   // Pega tendência inicial do BTC
   const btcInitial = await getBTCTrend();
   addLog(`📊 BTC inicial: ${btcInitial.direction} (${btcInitial.change.toFixed(2)}%)`, 'info');
   
-  await sendToPrivate(`🚀 BRUNO TRADER PRO V6.0 INICIADO
+  await sendToPrivate(`🚀 BRUNO TRADER PRO V6.1 INICIADO
 
 ━━━━━━━━━━━━━━━━━
 🎯 DAY TRADE PROFISSIONAL
@@ -2270,7 +2435,10 @@ app.listen(PORT, async () => {
 • Stop: ATR × 4.0/4.5/5.0 (por categoria)
 • Score mínimo: ${CONFIG.minScore}/100
 
-🆕 NOVIDADES V6.0:
+🆕 NOVIDADES V6.1:
+✅ Análise de Padrão de Volume PRO
+   (8 padrões: crescente, spike+continuidade,
+    spike+exaustão, decrescente, etc)
 ✅ Filtro BTC (-25 score contra)
 ✅ Stop por categoria
 ✅ Setup Quality (estrelas)
@@ -2293,7 +2461,7 @@ app.listen(PORT, async () => {
 ⏱ SISTEMA INICIADO
 📅 ${formatBrazilDateTime()}`);
   
-  setTimeout(() => { addLog('Primeira análise V6.0...', 'info'); analyzeMarket(); }, 10000);
+  setTimeout(() => { addLog('Primeira análise V6.1...', 'info'); analyzeMarket(); }, 10000);
   
   // 🆕 V6.0: Analisa mercado a cada 15 minutos
   setInterval(analyzeMarket, 900000);
@@ -2332,7 +2500,7 @@ bot.onText(/\/status/, async (msg) => {
   const todayKey = new Date().toISOString().split('T')[0];
   const signalsToday = state.signalsByDate[todayKey] || 0;
   
-  const message = `🤖 BRUNO TRADER PRO V6.0
+  const message = `🤖 BRUNO TRADER PRO V6.1
 
 ✅ Status: Online
 ⏰ Uptime: ${uptimeHours}h ${uptimeMins}min
@@ -2471,7 +2639,7 @@ TP3: ${state.manualStats.tp3Hits}
 bot.onText(/\/help|\/start/, async (msg) => {
   const chatId = msg.chat.id;
   
-  const message = `🤖 BRUNO TRADER PRO V6.0
+  const message = `🤖 BRUNO TRADER PRO V6.1
 
 📋 Comandos disponíveis:
 
@@ -2489,7 +2657,7 @@ bot.onText(/\/help|\/start/, async (msg) => {
 3. Quando fechar, marque com /trade
 4. Use /stats para ver desempenho
 
-📊 Bot Day Trade Profissional V6.0`;
+📊 Bot Day Trade Profissional V6.1`;
   
   try {
     await bot.sendMessage(chatId, message);
