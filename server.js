@@ -123,6 +123,57 @@ const CONFIG = {
     tp3: 2.5    // 2.5%
   },
   
+  // 🆕 V6.2: TPs REDUZIDOS para entrada AGRESSIVA (4h contra)
+  tpAggressive: {
+    tp1: 0.5,   // 0.5%
+    tp2: 1.0,   // 1.0%
+    tp3: 1.5    // 1.5%
+  },
+  
+  // 🆕 V6.2: SISTEMA DE PESOS POR TIMEFRAME
+  // 4h = contexto (peso leve), 1h = direção (peso alto), 15m = setup (peso máximo)
+  tfWeights: {
+    enabled: true,
+    h4: {
+      aligned: 10,      // 4h alinhado: +10
+      opposite: -8,     // 4h contra: -8
+      neutral: 0        // 4h lateral: 0
+    },
+    h1: {
+      aligned: 25,      // 1h alinhado: +25
+      opposite: -25     // 1h contra: -25 (peso alto)
+    },
+    m15: {
+      strong: 30,       // 15m setup forte: +30
+      medium: 10,       // 15m setup médio: +10
+      weak: -30         // 15m setup ruim: -30
+    }
+  },
+  
+  // 🆕 V6.2: NÍVEIS DE ENTRADA
+  entryLevels: {
+    enabled: true,
+    premium: {
+      label: '⭐ PREMIUM',
+      description: '4h + 1h + 15m alinhados',
+      minTFScore: 60,           // 4h(+10) + 1h(+25) + 15m(+30) = +65
+      tps: 'normal'             // TPs normais
+    },
+    normal: {
+      label: '✅ NORMAL',
+      description: '1h + 15m alinhados (4h neutro)',
+      minTFScore: 45,           // 1h(+25) + 15m(+30) = +55
+      tps: 'normal'             // TPs normais
+    },
+    aggressive: {
+      label: '⚡ AGRESSIVO',
+      description: '1h + 15m alinhados (4h contra)',
+      minTFScore: 35,           // 1h(+25) + 15m(+30) - 8 = +47
+      tps: 'aggressive'         // TPs reduzidos!
+    }
+    // Score TF < 35 = REJEITADO
+  },
+  
   // 🆕 V6.0: Distribuição manual (você executa)
   tpPartial: {
     enabled: true,
@@ -670,6 +721,169 @@ function hasActiveTradeInGroup(symbol, direction) {
 // ============================================
 
 // 🆕 V6.0: Pega multiplicador ATR baseado na categoria do par
+// ============================================
+// 🆕 V6.2: SISTEMA DE NÍVEIS DE ENTRADA
+// ============================================
+
+// 🆕 V6.2: Detecta tendência por timeframe específico
+function getTFTrend(structure, indicators, price) {
+  // Combina structure + EMA21 + MACD para determinar tendência
+  
+  if (!structure || !indicators || !indicators.ema21) {
+    return 'neutral';
+  }
+  
+  const aboveEMA = price > indicators.ema21;
+  const belowEMA = price < indicators.ema21;
+  const macdBullish = indicators.macd && indicators.macd.histogram > 0;
+  const macdBearish = indicators.macd && indicators.macd.histogram < 0;
+  
+  // BULLISH: structure bullish + acima EMA + MACD positivo
+  if (structure.trend === 'bullish' && aboveEMA && macdBullish) {
+    return 'bullish';
+  }
+  
+  // BEARISH: structure bearish + abaixo EMA + MACD negativo
+  if (structure.trend === 'bearish' && belowEMA && macdBearish) {
+    return 'bearish';
+  }
+  
+  // BULLISH FRACO: 2 de 3 indicadores positivos
+  let bullScore = 0;
+  if (structure.trend === 'bullish') bullScore++;
+  if (aboveEMA) bullScore++;
+  if (macdBullish) bullScore++;
+  
+  let bearScore = 0;
+  if (structure.trend === 'bearish') bearScore++;
+  if (belowEMA) bearScore++;
+  if (macdBearish) bearScore++;
+  
+  if (bullScore >= 2 && bearScore < 2) return 'bullish';
+  if (bearScore >= 2 && bullScore < 2) return 'bearish';
+  
+  return 'neutral';
+}
+
+// 🆕 V6.2: Calcula score de timeframes (4h + 1h + 15m)
+function calculateTFScore(direction, trend4h, trend1h, setupQuality15m) {
+  let score = 0;
+  const breakdown = {};
+  
+  const dirMatch = direction === 'LONG' ? 'bullish' : 'bearish';
+  const dirOpposite = direction === 'LONG' ? 'bearish' : 'bullish';
+  
+  // 4h - peso leve (contexto)
+  if (trend4h === dirMatch) {
+    score += CONFIG.tfWeights.h4.aligned;
+    breakdown.h4 = { value: CONFIG.tfWeights.h4.aligned, status: 'aligned' };
+  } else if (trend4h === dirOpposite) {
+    score += CONFIG.tfWeights.h4.opposite;
+    breakdown.h4 = { value: CONFIG.tfWeights.h4.opposite, status: 'opposite' };
+  } else {
+    score += CONFIG.tfWeights.h4.neutral;
+    breakdown.h4 = { value: CONFIG.tfWeights.h4.neutral, status: 'neutral' };
+  }
+  
+  // 1h - peso alto (direção)
+  if (trend1h === dirMatch) {
+    score += CONFIG.tfWeights.h1.aligned;
+    breakdown.h1 = { value: CONFIG.tfWeights.h1.aligned, status: 'aligned' };
+  } else if (trend1h === dirOpposite) {
+    score += CONFIG.tfWeights.h1.opposite;
+    breakdown.h1 = { value: CONFIG.tfWeights.h1.opposite, status: 'opposite' };
+  } else {
+    breakdown.h1 = { value: 0, status: 'neutral' };
+  }
+  
+  // 15m - peso máximo (setup)
+  if (setupQuality15m === 'strong') {
+    score += CONFIG.tfWeights.m15.strong;
+    breakdown.m15 = { value: CONFIG.tfWeights.m15.strong, status: 'strong' };
+  } else if (setupQuality15m === 'medium') {
+    score += CONFIG.tfWeights.m15.medium;
+    breakdown.m15 = { value: CONFIG.tfWeights.m15.medium, status: 'medium' };
+  } else {
+    score += CONFIG.tfWeights.m15.weak;
+    breakdown.m15 = { value: CONFIG.tfWeights.m15.weak, status: 'weak' };
+  }
+  
+  return { score, breakdown };
+}
+
+// 🆕 V6.2: Determina nível de entrada baseado no TF score
+function determineEntryLevel(tfResult, direction, trend4h) {
+  const { score, breakdown } = tfResult;
+  const dirMatch = direction === 'LONG' ? 'bullish' : 'bearish';
+  const dirOpposite = direction === 'LONG' ? 'bearish' : 'bullish';
+  
+  const aligned4h = trend4h === dirMatch;
+  const opposite4h = trend4h === dirOpposite;
+  const neutral4h = !aligned4h && !opposite4h;
+  
+  const aligned1h = breakdown.h1.status === 'aligned';
+  const setup15mGood = breakdown.m15.status === 'strong' || breakdown.m15.status === 'medium';
+  
+  // Verifica requisitos mínimos: 1h + 15m alinhados
+  if (!aligned1h || !setup15mGood) {
+    return null; // REJEITADO
+  }
+  
+  // PREMIUM: tudo alinhado + setup forte
+  if (aligned4h && breakdown.m15.status === 'strong' && score >= CONFIG.entryLevels.premium.minTFScore) {
+    return {
+      level: 'premium',
+      label: CONFIG.entryLevels.premium.label,
+      description: CONFIG.entryLevels.premium.description,
+      tps: CONFIG.tpFixed,           // TPs normais
+      tpType: 'normal'
+    };
+  }
+  
+  // AGRESSIVO: 4h contra
+  if (opposite4h && score >= CONFIG.entryLevels.aggressive.minTFScore) {
+    return {
+      level: 'aggressive',
+      label: CONFIG.entryLevels.aggressive.label,
+      description: CONFIG.entryLevels.aggressive.description,
+      tps: CONFIG.tpAggressive,      // TPs MENORES
+      tpType: 'aggressive'
+    };
+  }
+  
+  // NORMAL: 4h neutro ou alinhado mas setup não premium
+  if (score >= CONFIG.entryLevels.normal.minTFScore) {
+    return {
+      level: 'normal',
+      label: CONFIG.entryLevels.normal.label,
+      description: CONFIG.entryLevels.normal.description,
+      tps: CONFIG.tpFixed,           // TPs normais
+      tpType: 'normal'
+    };
+  }
+  
+  // Score baixo = REJEITADO
+  return null;
+}
+
+// 🆕 V6.2: Avalia qualidade do setup 15m
+function evaluateSetupQuality(structure, confluences, score) {
+  // FORTE: structure clara + 5+ confluências + score alto base
+  if (structure.choch && structure.bos && score >= 60) {
+    return 'strong';
+  }
+  
+  // FRACA: estrutura mal definida
+  if (!structure.trend || structure.trend === 'neutral') {
+    return 'weak';
+  }
+  
+  // MÉDIO: padrão
+  return 'medium';
+}
+
+// ============================================
+
 function getCategoryATRMult(symbol) {
   for (const [catKey, catData] of Object.entries(CONFIG.stopByCategory)) {
     if (catData.pairs.includes(symbol)) {
@@ -1294,7 +1508,7 @@ function analyzeVolume(candles) {
   
   const [r3, r2, r1, r0] = ratios; // r0 = mais recente
   
-  // 🆕 V6.1: ANÁLISE DE PADRÃO PROFISSIONAL
+  // 🆕 V6.2: ANÁLISE DE PADRÃO PROFISSIONAL
   const pattern = detectVolumePattern(r3, r2, r1, r0);
   
   return { 
@@ -1303,7 +1517,7 @@ function analyzeVolume(candles) {
     ratio: r0,                    // mantém compatibilidade
     spike: r0 > 2.0 || r1 > 2.0,
     increasing: r3 < r2 && r2 < r1 && r1 < r0,
-    // 🆕 V6.1: Novos campos
+    // 🆕 V6.2: Novos campos
     ratios: ratios,
     pattern: pattern.pattern,
     patternLabel: pattern.label,
@@ -1313,7 +1527,7 @@ function analyzeVolume(candles) {
   };
 }
 
-// 🆕 V6.1: DETECÇÃO DE PADRÃO PROFISSIONAL DE VOLUME
+// 🆕 V6.2: DETECÇÃO DE PADRÃO PROFISSIONAL DE VOLUME
 function detectVolumePattern(r3, r2, r1, r0) {
   // r0 = mais recente, r3 = mais antigo
   
@@ -1486,7 +1700,7 @@ async function analyzeSymbol(symbol) {
     
     const volume = analyzeVolume(candles15m);
     
-    // 🆕 V6.1: FILTRO PADRÃO VOLUME - rejeita padrões problemáticos
+    // 🆕 V6.2: FILTRO PADRÃO VOLUME - rejeita padrões problemáticos
     // Padrões inválidos: spike_exhaustion, decrescent, dead, low
     if (!volume.patternValid && volume.pattern !== 'insufficient_data') {
       return {
@@ -1585,7 +1799,7 @@ async function analyzeSymbol(symbol) {
     
     if (sr) { confluences.push('S/R'); score += CONFIG.scoreWeights.sr; }
     
-    // 🆕 V6.1: PADRÃO DE VOLUME PROFISSIONAL
+    // 🆕 V6.2: PADRÃO DE VOLUME PROFISSIONAL
     // Substitui análise simples por detecção de 8 padrões diferentes
     if (volume.pattern && volume.pattern !== 'insufficient_data') {
       confluences.push(volume.patternLabel);
@@ -1603,7 +1817,7 @@ async function analyzeSymbol(symbol) {
       score += CONFIG.scoreWeights.adxBonus;
     }
     
-    // 🆕 V6.1: BONUS Volume Extremo apenas se padrão for VÁLIDO
+    // 🆕 V6.2: BONUS Volume Extremo apenas se padrão for VÁLIDO
     // (evita pontuar spike + exaustão como bom)
     if (volume.ratio > 2.5 && volume.patternValid) {
       confluences.push(`Volume Extremo (${volume.ratio.toFixed(1)}x)`);
@@ -1620,24 +1834,51 @@ async function analyzeSymbol(symbol) {
       confluences.push('Horário Fraco');
     }
     
-    const trendAlignment = (structure15m.trend === structure1h.trend && structure1h.trend === structure4h.trend);
+    // 🆕 V6.2: NOVO SISTEMA DE NÍVEIS DE ENTRADA (substitui alinhamento rígido)
+    const direction = structure15m.trend === 'bullish' ? 'LONG' : 'SHORT';
     
-    if (trendAlignment) {
-      confluences.push(`Tendência ${structure15m.trend} alinhada 15m/1h/4h`);
-      score += CONFIG.scoreWeights.trendAlignment;
-    } else {
-      return { 
-        valid: false, 
-        reason: `Tendências desalinhadas (15m:${structure15m.trend} 1h:${structure1h.trend} 4h:${structure4h.trend})`,
+    // Detecta tendência por TF usando structure + indicadores
+    const trend15m = getTFTrend(structure15m, ind15m, candles15m[candles15m.length-1].close);
+    const trend1h = getTFTrend(structure1h, ind1h, candles1h[candles1h.length-1].close);
+    const trend4h = getTFTrend(structure4h, ind4h, candles4h[candles4h.length-1].close);
+    
+    // Avalia qualidade do setup 15m
+    const setupQuality15m = evaluateSetupQuality(structure15m, confluences, score);
+    
+    // Calcula score por timeframe
+    const tfResult = calculateTFScore(direction, trend4h, trend1h, setupQuality15m);
+    
+    // Determina nível de entrada (Premium/Normal/Agressivo/Rejeitado)
+    const entryLevel = determineEntryLevel(tfResult, direction, trend4h);
+    
+    if (!entryLevel) {
+      return {
+        valid: false,
+        reason: `Setup TF inválido: 4h=${trend4h} 1h=${trend1h} 15m=${setupQuality15m} (TF score: ${tfResult.score})`,
         score: score,
         volumeRatio: volume.ratio.toFixed(2),
         adx: ind15m.adx.toFixed(1),
-        direction: structure15m.trend === 'bullish' ? 'LONG' : 'SHORT'
+        direction: direction,
+        tfScore: tfResult.score
       };
     }
     
+    // Adiciona score do TF ao score base
+    score += tfResult.score;
+    
+    // Confluences contextual
+    confluences.push(`${entryLevel.label}`);
+    if (trend4h === 'bullish' && direction === 'LONG' || trend4h === 'bearish' && direction === 'SHORT') {
+      confluences.push(`📈 4h alinhado`);
+    } else if (trend4h === 'bullish' && direction === 'SHORT' || trend4h === 'bearish' && direction === 'LONG') {
+      confluences.push(`⚠️ 4h contra (entry agressiva)`);
+    } else {
+      confluences.push(`➡️ 4h neutro`);
+    }
+    
+    addLog(`📊 ${symbol}: ${entryLevel.label} (TF: ${tfResult.score}, 4h:${trend4h} 1h:${trend1h} 15m:${setupQuality15m})`, 'info');
+    
     // 🆕 V6.0: APLICA FILTRO BTC (-25 se contra)
-    const direction = structure15m.trend === 'bullish' ? 'LONG' : 'SHORT';
     const btcTrend = state.btcStatus.direction !== 'unknown' ? 
                      { direction: state.btcStatus.direction, change: state.btcStatus.change4h } :
                      await getBTCTrend();
@@ -1699,10 +1940,13 @@ async function analyzeSymbol(symbol) {
     
     let stop, tp1, tp2, tp3;
     
-    // 🆕 V6.0: TPs fixos (Day Trade)
-    const TP1_PCT = CONFIG.tpFixed.tp1 / 100;  // 0.7% = 0.007
-    const TP2_PCT = CONFIG.tpFixed.tp2 / 100;  // 1.5% = 0.015
-    const TP3_PCT = CONFIG.tpFixed.tp3 / 100;  // 2.5% = 0.025
+    // 🆕 V6.2: TPs adaptáveis por nível de entrada
+    // Premium/Normal = TPs normais (0.7/1.5/2.5)
+    // Agressivo = TPs reduzidos (0.5/1.0/1.5)
+    const tpsToUse = entryLevel.tps;  // já vem do entryLevel
+    const TP1_PCT = tpsToUse.tp1 / 100;
+    const TP2_PCT = tpsToUse.tp2 / 100;
+    const TP3_PCT = tpsToUse.tp3 / 100;
     
     if (direction === 'LONG') {
       stop = entry - atrStop;
@@ -1783,11 +2027,21 @@ async function analyzeSymbol(symbol) {
       setupQuality: setupQuality.stars,
       setupVisual: setupQuality.visual,
       setupLabel: setupQuality.label,
-      // 🆕 V6.1: Padrão de volume
+      // 🆕 V6.2: Padrão de volume
       volumePattern: volume.pattern,
       volumePatternLabel: volume.patternLabel,
       volumePatternScore: volume.patternScore,
       volumeRatios: volume.ratios.map(r => r.toFixed(2)),
+      // 🆕 V6.2: Sistema de níveis
+      entryLevel: entryLevel.level,
+      entryLevelLabel: entryLevel.label,
+      entryLevelDescription: entryLevel.description,
+      entryLevelTPType: entryLevel.tpType,
+      tfScore: tfResult.score,
+      tfBreakdown: tfResult.breakdown,
+      trend4h: trend4h,
+      trend1h: trend1h,
+      trend15m: setupQuality15m,
       // Tracking
       reachedTP1: false,
       reachedTP2: false,
@@ -1968,11 +2222,15 @@ async function analyzeMarket() {
         confluencesText = confluencesText.substring(0, 497) + '...';
       }
       
-      const message = `🚨 DAY TRADE SIGNAL V6.1 | ${signal.symbol}
+      // 🆕 V6.2: TPs corretos baseado no nível
+      const tpUsed = signal.entryLevelTPType === 'aggressive' ? CONFIG.tpAggressive : CONFIG.tpFixed;
+      
+      const message = `🚨 DAY TRADE SIGNAL V6.2 | ${signal.symbol}
 
 📈 Direção: ${signal.direction}
 ⚡ Alavancagem: ${CONFIG.leverage}x
 ${signal.setupVisual} ${signal.setupLabel}
+${signal.entryLevelLabel || ''}
 
 💰 Entrada: ${signal.entry}
 📍 Zona: ${zoneMin} — ${zoneMax}
@@ -1980,23 +2238,28 @@ ${signal.setupVisual} ${signal.setupLabel}
 
 🎯 Take Profits
 
-🥇 TP1: ${signal.tp1} (+${CONFIG.tpFixed.tp1}%)
-🥈 TP2: ${signal.tp2} (+${CONFIG.tpFixed.tp2}%)
-🥉 TP3: ${signal.tp3} (+${CONFIG.tpFixed.tp3}%)
+🥇 TP1: ${signal.tp1} (+${tpUsed.tp1}%)
+🥈 TP2: ${signal.tp2} (+${tpUsed.tp2}%)
+🥉 TP3: ${signal.tp3} (+${tpUsed.tp3}%)
+${signal.entryLevelTPType === 'aggressive' ? '⚠️ TPs reduzidos (entrada agressiva contra 4h)' : ''}
 ━━━━━━━━━━━━━━━━━
 📊 Risk / Reward
 📉 Risco: ${Math.abs(parseFloat(riskPercent))}%
-📈 Retorno Máx: ${CONFIG.tpFixed.tp3}%
+📈 Retorno Máx: ${tpUsed.tp3}%
 ⚖️ RR: 1:${signal.rr}
+━━━━━━━━━━━━━━━━━
+📊 Multi-Timeframe Analysis
+🕐 4h: ${signal.trend4h === 'bullish' ? '📈 ALTA' : signal.trend4h === 'bearish' ? '📉 BAIXA' : '➡️ NEUTRO'} (${signal.tfBreakdown && signal.tfBreakdown.h4 ? (signal.tfBreakdown.h4.value > 0 ? '+' : '') + signal.tfBreakdown.h4.value : '0'})
+🕐 1h: ${signal.trend1h === 'bullish' ? '📈 ALTA' : signal.trend1h === 'bearish' ? '📉 BAIXA' : '➡️ NEUTRO'} (${signal.tfBreakdown && signal.tfBreakdown.h1 ? (signal.tfBreakdown.h1.value > 0 ? '+' : '') + signal.tfBreakdown.h1.value : '0'})
+🕐 15m: ${signal.trend15m === 'strong' ? '💪 FORTE' : signal.trend15m === 'medium' ? '👍 Médio' : '👎 Fraco'} (${signal.tfBreakdown && signal.tfBreakdown.m15 ? (signal.tfBreakdown.m15.value > 0 ? '+' : '') + signal.tfBreakdown.m15.value : '0'})
+🎯 Score TF: ${signal.tfScore !== undefined ? (signal.tfScore > 0 ? '+' : '') + signal.tfScore : 'N/A'}
 ━━━━━━━━━━━━━━━━━
 📊 Dados do Trade
 
-📊 Tendência: ${trendText}
 📈 Volume: ${volumeText} (${signal.volumeRatio}x)
 ${signal.volumePatternLabel ? `🔍 Padrão Vol: ${signal.volumePatternLabel}\n📊 Sequência: ${signal.volumeRatios ? signal.volumeRatios.join('→') + 'x' : 'N/A'}` : ''}
-⚡ Força: ${forceText}
 🔥 Volatilidade: Média/Alta
-🎯 Score: ${signal.score}/100
+🎯 Score Final: ${signal.score}/100
 📊 ADX: ${signal.adx} (Tendência ${signal.adx > 30 ? 'Forte' : 'Média'})
 📏 ATR: ${signal.atr}
 ${signal.btcAlignment === 'self' 
@@ -2012,7 +2275,7 @@ ${confluencesText}
 ━━━━━━━━━━━━━━━━━━
 📡 Exchange: Binance Futures
 ⏱ Timeframe: 15m
-📊 Tipo: Day Trade Profissional V6.1
+📊 Tipo: Day Trade Profissional V6.2
 ⏳ Duração Estimada: 2h — 8h
 ━━━━━━━━━━━━━━━━━
 📅 Data: ${formatBrazilDate()}
@@ -2248,7 +2511,7 @@ app.get('/api/status', (req, res) => {
     
     riskMode: state.riskMode,
     config: {
-      style: 'Day Trade Profissional V6.1', 
+      style: 'Day Trade Profissional V6.2', 
       timeframes: '15m + 1h + 4h + BTC 4h',
       minScore: CONFIG.minScore, 
       pairs: CONFIG.pairs.length,
@@ -2410,19 +2673,19 @@ app.get('/health', (req, res) => res.send('OK'));
 
 app.listen(PORT, async () => {
   addLog('========================================', 'success');
-  addLog('BRUNO TRADER PRO V6.1 - DAY TRADE PROFISSIONAL', 'success');
+  addLog('BRUNO TRADER PRO V6.2 - DAY TRADE PROFISSIONAL', 'success');
   addLog('========================================', 'success');
   addLog(`Pares: ${CONFIG.pairs.length}`, 'info');
   addLog(`Score mínimo: ${CONFIG.minScore}/100`, 'info');
   addLog(`TPs: ${CONFIG.tpFixed.tp1}% / ${CONFIG.tpFixed.tp2}% / ${CONFIG.tpFixed.tp3}%`, 'info');
   addLog(`Stop por categoria (Blue Chip 4x | Alts 4.5x | Memecoin 5x)`, 'info');
-  addLog(`✅ V6.1: Day Trade + Filtro BTC + Tracking sem operação`, 'success');
+  addLog(`✅ V6.2: Day Trade + Filtro BTC + Tracking sem operação`, 'success');
   
   // Pega tendência inicial do BTC
   const btcInitial = await getBTCTrend();
   addLog(`📊 BTC inicial: ${btcInitial.direction} (${btcInitial.change.toFixed(2)}%)`, 'info');
   
-  await sendToPrivate(`🚀 BRUNO TRADER PRO V6.1 INICIADO
+  await sendToPrivate(`🚀 BRUNO TRADER PRO V6.2 INICIADO
 
 ━━━━━━━━━━━━━━━━━
 🎯 DAY TRADE PROFISSIONAL
@@ -2435,10 +2698,21 @@ app.listen(PORT, async () => {
 • Stop: ATR × 4.0/4.5/5.0 (por categoria)
 • Score mínimo: ${CONFIG.minScore}/100
 
-🆕 NOVIDADES V6.1:
+🆕 NOVIDADES V6.2:
+✅ SISTEMA DE NÍVEIS DE ENTRADA
+   ⭐ PREMIUM (3 TFs alinhados)
+   ✅ NORMAL (1h+15m alinhados)
+   ⚡ AGRESSIVO (4h contra, TPs reduzidos)
+✅ 4h como CONTEXTO (não filtro rígido)
+✅ Pesos por TF (4h=10, 1h=25, 15m=30)
+✅ TPs adaptáveis por nível
+✅ Análise Multi-TF detalhada nos sinais
+
+🆕 V6.1 (mantido):
 ✅ Análise de Padrão de Volume PRO
-   (8 padrões: crescente, spike+continuidade,
-    spike+exaustão, decrescente, etc)
+   (8 padrões diferentes)
+
+🆕 V6.0 (mantido):
 ✅ Filtro BTC (-25 score contra)
 ✅ Stop por categoria
 ✅ Setup Quality (estrelas)
@@ -2461,7 +2735,7 @@ app.listen(PORT, async () => {
 ⏱ SISTEMA INICIADO
 📅 ${formatBrazilDateTime()}`);
   
-  setTimeout(() => { addLog('Primeira análise V6.1...', 'info'); analyzeMarket(); }, 10000);
+  setTimeout(() => { addLog('Primeira análise V6.2...', 'info'); analyzeMarket(); }, 10000);
   
   // 🆕 V6.0: Analisa mercado a cada 15 minutos
   setInterval(analyzeMarket, 900000);
@@ -2500,7 +2774,7 @@ bot.onText(/\/status/, async (msg) => {
   const todayKey = new Date().toISOString().split('T')[0];
   const signalsToday = state.signalsByDate[todayKey] || 0;
   
-  const message = `🤖 BRUNO TRADER PRO V6.1
+  const message = `🤖 BRUNO TRADER PRO V6.2
 
 ✅ Status: Online
 ⏰ Uptime: ${uptimeHours}h ${uptimeMins}min
@@ -2639,7 +2913,7 @@ TP3: ${state.manualStats.tp3Hits}
 bot.onText(/\/help|\/start/, async (msg) => {
   const chatId = msg.chat.id;
   
-  const message = `🤖 BRUNO TRADER PRO V6.1
+  const message = `🤖 BRUNO TRADER PRO V6.2
 
 📋 Comandos disponíveis:
 
@@ -2657,7 +2931,7 @@ bot.onText(/\/help|\/start/, async (msg) => {
 3. Quando fechar, marque com /trade
 4. Use /stats para ver desempenho
 
-📊 Bot Day Trade Profissional V6.1`;
+📊 Bot Day Trade Profissional V6.2`;
   
   try {
     await bot.sendMessage(chatId, message);
